@@ -9,7 +9,7 @@
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
 """
 
-__all__ = frozenset(["InvalidOperation", "InvalidPayload"])
+__all__ = frozenset(["InvalidOperation", "InvalidPayload", "InvalidPath"])
 
 
 class InvalidOperation(ValueError):
@@ -27,3 +27,17 @@ class InvalidPayload(ValueError):
 
     :param bytes operation: invalid payload value.
     """
+
+
+class InvalidPath(ValueError):
+    """Exception raised when a path proccessed by a comand doesn't
+    match the following constraints:
+
+    * its length should not exceed 3072 or 2048 for absolute and relative
+      path respectively.
+    * it should only consist of ASCII alphanumerics and the four
+      punctuation characters ``-/_@`` -- `hyphen`, `slash`, `underscore`
+      and `atsign`.
+
+    :param bytes path: invalid path value.
+"""

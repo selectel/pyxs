@@ -10,12 +10,14 @@
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+import posixpath
+import re
 import socket
 import struct
 from collections import namedtuple
 from itertools import imap
 
-from .exceptions import InvalidOperation, InvalidPayload
+from .exceptions import InvalidOperation, InvalidPayload, InvalidPath
 
 
 #: Operations supported by XenStore.
@@ -101,7 +103,7 @@ class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
 class Connection(object):
     """XenStore connection object.
 
-    The following conventions are used to desribe method arguments:
+    The following conventions are used to describe method arguments:
 
     =======  ============================================================
     Symbol   Semantics
@@ -132,6 +134,9 @@ class Connection(object):
         self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.socket.connect(addr)
 
+    # Private API.
+    # ............
+
     def send(self, type, payload):
         self.socket.send(str(Packet(type, payload)))
 
@@ -147,6 +152,45 @@ class Connection(object):
         else:
             return Packet.from_string("".join(chunks))
 
+    def command(self, type, *args):
+        self.send(type, "\x00".join(args))
+
+    def validate_path(path):
+        """Checks if a given path is valid -- that is when it doesn't
+        contain any characters other than ASCII alphanumerics and
+        ``-/_@`` and its length doesn't exceed 3072 and 2048 bytes for
+        absolute and relative path respectively.
+
+        :param bytes path: path to check.
+        :raises pyxs.exceptions.InvalidPath: when path fails to validate.
+        """
+        # Paths longer than 3072 bytes are forbidden; clients specifying
+        # relative paths should keep them to within 2048 bytes.
+        max_len = 3072 if posixpath.abs(path) else 2048
+
+        if not (re.match(r"^[a-zA-Z0-9-/_@]+$", path) and
+                len(path) <= max_len):
+            raise InvalidPath(path)
+
+    # Public API.
+    # ...........
+
+    def read(self, path):
+        """Reads the octet string value at a given path.
+
+        **Syntax**: ``<path>|``
+        """
+        self.validate_path(path)
+        return self.command(Op.READ, path + "\x00")
+
+    def write(self, path, value):
+        """Write a value to a given path.
+
+        **Syntax**: ``<path>|<value|>``
+        """
+        self.validate_path(path)
+        return self.command(Op.WRITE, path, bytes(value))
+
     def debug(self, *args):
         """A simple echo call.
 
@@ -157,4 +201,4 @@ class Connection(object):
           "check"|??                    check xenstored internals
           <anything-else|>              no-op (future extension)
         """
-        return self.send(Op.DEBUG, "\x00".join(map(bytes, args)))
+        return self.command(Op.DEBUG, *map(bytes, args))
