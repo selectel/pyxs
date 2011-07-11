@@ -5,6 +5,8 @@
 
     This module implements a number of Python exceptions used by
     :mod:`pyxs` classes.
+
+    :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
 """
 
 __all__ = frozenset(["InvalidOperation", "InvalidPayload"])
