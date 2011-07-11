@@ -104,4 +104,5 @@ class Connection(object):
             return Packet.from_string("".join(chunks))
 
     def debug(self, *args):
+        """A simple echo call."""
         return self.send(XS_DEBUG, "\x00".join(map(bytes, args)))
