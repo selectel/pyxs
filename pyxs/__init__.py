@@ -9,34 +9,42 @@
 import socket
 import struct
 from collections import namedtuple
+from itertools import imap
 
 
 #: Packet types, supported by XenStore.
-(XS_DEBUG,
- XS_DIRECTORY,
- XS_READ,
- XS_GET_PERMS,
- XS_WATCH,
- XS_UNWATCH,
- XS_TRANSACTION_START,
- XS_TRANSACTION_END,
- XS_INTRODUCE,
- XS_RELEASE,
- XS_GET_DOMAIN_PATH,
- XS_WRITE,
- XS_MKDIR,
- XS_RM,
- XS_SET_PERMS,
- XS_WATCH_EVENT,
- XS_ERROR,
- XS_IS_DOMAIN_INTRODUCED,
- XS_RESUME,
- XS_SET_TARGET) = xrange(20)
+PACKET_TYPES = (
+    XS_DEBUG,
+    XS_DIRECTORY,
+    XS_READ,
+    XS_GET_PERMS,
+    XS_WATCH,
+    XS_UNWATCH,
+    XS_TRANSACTION_START,
+    XS_TRANSACTION_END,
+    XS_INTRODUCE,
+    XS_RELEASE,
+    XS_GET_DOMAIN_PATH,
+    XS_WRITE,
+    XS_MKDIR,
+    XS_RM,
+    XS_SET_PERMS,
+    XS_WATCH_EVENT,
+    XS_ERROR,
+    XS_IS_DOMAIN_INTRODUCED,
+    XS_RESUME,
+    XS_SET_TARGET
+) = range(20)
 
 XS_RESTRICT = 128
 
+# ``XS_RESTRICT`` is somewhat an exception, so we need to add it
+# manually -- we also convert ``PACKET_TYPES`` to a set() to get
+# O(1) presence lookups.
+PACKET_TYPES = set(PACKET_TYPES + [XS_RESTRICT])
 
-class Header(namedtuple("_Header", "type req_id tx_id len")):
+
+class Packet(namedtuple("_Packet", "type req_id tx_id len payload")):
     #: ``xsd_sockmsg`` struct format see ``xen/include/public/io/xs_wire.h``
     #: for details.
     _fmt = "IIII"
@@ -44,26 +52,25 @@ class Header(namedtuple("_Header", "type req_id tx_id len")):
     #: ``xsd_sockmsg`` struct size.
     _fmt_size = struct.calcsize(_fmt)
 
-    @classmethod
-    def from_string(cls, s):
-        return cls(*map(int, struct.unpack(cls._fmt, s[:cls._fmt_size])))
-
-    def __str__(self):
-        return struct.pack(self._fmt, *self)
-
-
-class Packet(namedtuple("_Packet", "header payload")):
     def __new__(cls, type, payload, req_id=None, tx_id=None):
-        header = Header(type, req_id or 0, tx_id or 0, len(payload))
-        return super(Packet, cls).__new__(cls, header, payload)
+        if type not in PACKET_TYPES:
+            raise ValueError("Invalid packet type: {0}".format(type))
+
+        # ``0`` transaction id means no transaction is running.
+        if tx_id is None: tx_id = 0
+
+        return super(Packet, cls).__new__(cls,
+            type, req_id or 0, tx_id, len(payload), payload)
 
     @classmethod
     def from_string(cls, s):
-        header = Header.from_string(s)
-        return cls(header, s[-header.len:])
+        type, req_id, tx_id, l = map(int, struct.unpack(cls._fmt,
+                                                        s[:cls._fmt_size]))
+        return cls(type, s[-l:], req_id, tx_id)
 
     def __str__(self):
-        return str(self.header) + self.payload
+        # Note the ``[:-1]`` slice -- the actual payload is excluded.
+        return struct.pack(self._fmt, *self[:-1]) + self.payload
 
 
 class Connection(object):
@@ -72,6 +79,16 @@ class Connection(object):
         self.socket.connect(addr)
 
     def send(self, type, payload):
+        # Checking restrictions:
+
+        # a) payload is limited to 4096 bytes.
+        if len(payload) > 4096:
+            raise ValueError("payload size exceeded: {0}".format(len(payload)))
+        # b) xenstore values should normally be 7-bit ASCII text strings
+        #    containing bytes 0x20..0x7f only.
+        if any(c and (c > 0x7f or c < 0x20) for c in imap(ord, payload)):
+            raise ValueError("payload contains invalid characters.")
+
         self.socket.send(str(Packet(type, payload)))
 
         chunks, done = [], False
@@ -85,3 +102,6 @@ class Connection(object):
                 done = len(data) <= 1024
         else:
             return Packet.from_string("".join(chunks))
+
+    def debug(self, *args):
+        return self.send(XS_DEBUG, "\x00".join(map(bytes, args)))
