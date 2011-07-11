@@ -79,8 +79,6 @@ class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
         if op not in Op:
             raise InvalidOperation(op)
 
-
-
         if tx_id is None: tx_id = 0
 
         return super(Packet, cls).__new__(cls,
