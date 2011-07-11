@@ -45,6 +45,7 @@ PACKET_TYPES = set(PACKET_TYPES + [XS_RESTRICT])
 
 
 class Packet(namedtuple("_Packet", "type req_id tx_id len payload")):
+    """A single message to or from XenStore."""
     #: ``xsd_sockmsg`` struct format see ``xen/include/public/io/xs_wire.h``
     #: for details.
     _fmt = "IIII"
@@ -74,6 +75,35 @@ class Packet(namedtuple("_Packet", "type req_id tx_id len payload")):
 
 
 class Connection(object):
+    """XenStore connection object.
+
+    The following conventions are used to desribe method arguments:
+
+    =======  ============================================================
+    Symbol   Semantics
+    =======  ============================================================
+    ``|``    A ``NULL`` (zero) byte.
+    <foo>    A string guaranteed not to contain any ``NULL`` bytes.
+    <foo|>   Binary data (which may contain zero or more ``NULL`` bytes).
+    <foo>|*  Zero or more strings each followed by a trailing ``NULL``.
+    <foo>|+  One or more strings each followed by a trailing ``NULL``.
+    ?        Reserved value (may not contain ``NULL`` bytes).
+    ??       Reserved value (may contain ``NULL`` bytes).
+    =======  ============================================================
+
+    .. note::
+
+       According to ``docs/misc/xenstore.txt`` in the current
+       implementation reserved values are just empty strings. So for
+       example ``"\\x00\\x00\\x00"`` is a valid ``??`` symbol.
+
+    Here're some examples:
+
+    >>> c = Connection("/var/run/xenstored/socket")
+    >>> c.debug("print", "hello world!", "\x00")
+    _Packet(type=0, req_id=0, tx_id=0, len=3, payload='OK\x00')
+    """
+
     def __init__(self, addr):
         self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.socket.connect(addr)
@@ -104,5 +134,13 @@ class Connection(object):
             return Packet.from_string("".join(chunks))
 
     def debug(self, *args):
-        """A simple echo call."""
+        """A simple echo call.
+
+        **Syntax**::
+
+          "print"|<string>|??           sends <string> to debug log
+          "print"|<thing-with-no-null>  EINVAL
+          "check"|??                    check xenstored internals
+          <anything-else|>              no-op (future extension)
+        """
         return self.send(XS_DEBUG, "\x00".join(map(bytes, args)))
