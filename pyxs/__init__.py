@@ -6,65 +6,89 @@
     Pure Python bindings for communicating with XenStore over Unix socket.
 """
 
+from __future__ import absolute_import, print_function, unicode_literals
+
 import socket
 import struct
 from collections import namedtuple
 from itertools import imap
 
-
-#: Packet types, supported by XenStore.
-PACKET_TYPES = (
-    XS_DEBUG,
-    XS_DIRECTORY,
-    XS_READ,
-    XS_GET_PERMS,
-    XS_WATCH,
-    XS_UNWATCH,
-    XS_TRANSACTION_START,
-    XS_TRANSACTION_END,
-    XS_INTRODUCE,
-    XS_RELEASE,
-    XS_GET_DOMAIN_PATH,
-    XS_WRITE,
-    XS_MKDIR,
-    XS_RM,
-    XS_SET_PERMS,
-    XS_WATCH_EVENT,
-    XS_ERROR,
-    XS_IS_DOMAIN_INTRODUCED,
-    XS_RESUME,
-    XS_SET_TARGET
-) = range(20)
-
-XS_RESTRICT = 128
-
-# ``XS_RESTRICT`` is somewhat an exception, so we need to add it
-# manually -- we also convert ``PACKET_TYPES`` to a set() to get
-# O(1) presence lookups.
-PACKET_TYPES = set(PACKET_TYPES + [XS_RESTRICT])
+from .exceptions import InvalidOperation, InvalidPayload
 
 
-class Packet(namedtuple("_Packet", "type req_id tx_id len payload")):
-    """A single message to or from XenStore."""
+#: Operations supported by XenStore.
+Op = namedtuple("Operation", [
+    "DEBUG",
+    "DIRECTORY",
+    "READ",
+    "GET_PERMS",
+    "WATCH",
+    "UNWATCH",
+    "TRANSACTION_START",
+    "TRANSACTION_END",
+    "INTRODUCE",
+    "RELEASE",
+    "GET_DOMAIN_PATH",
+    "WRITE",
+    "MKDIR",
+    "RM",
+    "SET_PERMS",
+    "WATCH_EVENT",
+    "ERROR",
+    "IS_DOMAIN_INTRODUCED",
+    "RESUME",
+    "SET_TARGET",
+    "RESTRICT"
+])(*(range(20) + [128]))
+
+
+class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
+    """A single message to or from XenStore.
+
+    :param int op: an item from :data:`~pyxs.Op`, representing
+                   operation, performed by this packet.
+    :param bytes payload: packet payload, should be a valid ASCII-string
+                          with characters between ``[0x20;0x7f]``.
+    :param int req_id: request id -- hopefuly a **unique** identifier
+                       for this packet.
+    :param int tx_id: transaction id, defaults to ``0`` -- which means
+                      no transaction is running.
+    """
     #: ``xsd_sockmsg`` struct format see ``xen/include/public/io/xs_wire.h``
     #: for details.
-    _fmt = "IIII"
+    _fmt = b"IIII"
 
     #: ``xsd_sockmsg`` struct size.
     _fmt_size = struct.calcsize(_fmt)
 
-    def __new__(cls, type, payload, req_id=None, tx_id=None):
-        if type not in PACKET_TYPES:
-            raise ValueError("Invalid packet type: {0}".format(type))
+    def __new__(cls, op, payload, req_id, tx_id=None):
+        if isinstance(payload, unicode):
+            payload = payload.encode("utf-8")
 
-        # ``0`` transaction id means no transaction is running.
+        # Checking restrictions:
+        # a) payload is limited to 4096 bytes.
+        if len(payload) > 4096:
+            raise InvalidPayload(payload)
+        # b) xenstore values should normally be 7-bit ASCII text strings
+        #    containing bytes 0x20..0x7f only.
+        if any(c and (c > 0x7f or c < 0x20) for c in imap(ord, payload)):
+            raise InvalidPayload(payload)
+        # c) operation requested is present in ``xsd_sockmsg_type``.
+        if op not in Op:
+            raise InvalidOperation(op)
+
+
+
         if tx_id is None: tx_id = 0
 
         return super(Packet, cls).__new__(cls,
-            type, req_id or 0, tx_id, len(payload), payload)
+            op, req_id or 0, tx_id, len(payload), payload)
 
     @classmethod
     def from_string(cls, s):
+        if isinstance(s, unicode):
+            s = s.encode("utf-8")
+
         type, req_id, tx_id, l = map(int, struct.unpack(cls._fmt,
                                                         s[:cls._fmt_size]))
         return cls(type, s[-l:], req_id, tx_id)
@@ -109,16 +133,6 @@ class Connection(object):
         self.socket.connect(addr)
 
     def send(self, type, payload):
-        # Checking restrictions:
-
-        # a) payload is limited to 4096 bytes.
-        if len(payload) > 4096:
-            raise ValueError("payload size exceeded: {0}".format(len(payload)))
-        # b) xenstore values should normally be 7-bit ASCII text strings
-        #    containing bytes 0x20..0x7f only.
-        if any(c and (c > 0x7f or c < 0x20) for c in imap(ord, payload)):
-            raise ValueError("payload contains invalid characters.")
-
         self.socket.send(str(Packet(type, payload)))
 
         chunks, done = [], False
@@ -143,4 +157,4 @@ class Connection(object):
           "check"|??                    check xenstored internals
           <anything-else|>              no-op (future extension)
         """
-        return self.send(XS_DEBUG, "\x00".join(map(bytes, args)))
+        return self.send(Op.DEBUG, "\x00".join(map(bytes, args)))

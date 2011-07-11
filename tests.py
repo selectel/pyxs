@@ -2,23 +2,31 @@
 
 import pytest
 
-from pyxs import Packet
+from pyxs import Op, Packet, InvalidOperation, InvalidPayload
 
 
 def test_packet():
-    # a) invalid packet type.
-    with pytest.raises(ValueError):
-        Packet(-1, 0, 0, 0)
+    # a) invalid operation.
+    with pytest.raises(InvalidOperation):
+        Packet(-1, "", 0)
+
+    # b) invalid payload -- forbidden characters.
+    with pytest.raises(InvalidPayload):
+        Packet(Op.DEBUG, "\x15hello world!\x07", 0)
+
+    # c) invalid payload -- maximum size exceeded.
+    with pytest.raises(InvalidPayload):
+        Packet(Op.DEBUG, "hello" * 4096, 0)
 
 
 def test_packet_from_string():
-    d = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00OK\x00"
+    d = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00OK\x00"
     p = Packet.from_string(d)
 
-    assert p.type == 0
+    assert p.op == Op.DEBUG
     assert p.req_id == 0
     assert p.tx_id == 0
     assert p.len == 3
-    assert p.payload == "OK\x00"
+    assert p.payload == b"OK\x00"
     assert len(p.payload) == p.len
     assert str(p) == d
