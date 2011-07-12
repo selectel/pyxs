@@ -10,7 +10,7 @@
 """
 
 __all__ = frozenset([
-    "InvalidOperation", "InvalidPayload", "InvalidPath", "InvalidSyntax"
+    "InvalidOperation", "InvalidPayload", "InvalidPath", "InvalidTerm"
 ])
 
 
@@ -46,7 +46,7 @@ class InvalidPath(ValueError):
 """
 
 
-class InvalidSyntax(ValueError):
+class InvalidTerm(SyntaxError):
     """Exception raised by :func:`~pyxs.helpers.compile` when a given
-    syntax is invalid, i. e. doesn't match any of the recognized forms.
+    term is invalid, i. e. doesn't match any of the recognized forms.
     """

@@ -5,7 +5,7 @@ import string
 import pytest
 
 from pyxs import Op, Packet
-from pyxs.exceptions import InvalidOperation, InvalidPayload, InvalidPath
+from pyxs.exceptions import InvalidOperation, InvalidPayload, InvalidPath, InvalidTerm
 from pyxs.helpers import compile, spec, validate_path
 
 
@@ -91,6 +91,11 @@ def test_compile():
     assert not regex.match("foo\x00bar\x00\x00")
     assert not regex.match("\x00")
     assert not regex.match("")
+
+    # f) invalid term syntax.
+    for term in ["<foo", "<foo><bar>", "<foo >"]:
+        with pytest.raises(InvalidTerm):
+            compile(term)
 
 
 def test_validate_path():

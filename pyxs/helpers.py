@@ -19,7 +19,7 @@ from functools import wraps
 from future_builtins import map, zip
 from warnings import warn
 
-from .exceptions import InvalidSyntax, InvalidPath
+from .exceptions import InvalidTerm, InvalidPath
 
 
 def compile(*terms):
@@ -31,29 +31,26 @@ def compile(*terms):
               a priority.
     """
     def inner(term):
-        if term.startswith("<"):
-            end = term.endswith
-
-            # <foo|>
-            if end("|>"):
-                return term[1:-2], "[\x20-\x7f\x00]+"
-            # <foo>|*
-            elif end(b">|*"):
-                _, regex = inner(term[:-1])
-                return term[1:-3], "(?:{0})*".format(regex)
-            # <foo>|+
-            elif end(b">|+"):
-                _, regex = inner(term[:-1])
-                return term[1:-3], "(?:{0})+".format(regex)
-            # <foo>|
-            elif end(b">|"):
-                _, regex = inner(term[:-1])
-                return term[1:-2], "{0}\x00".format(regex)
-            # <foo>
-            elif end(b">"):
-                return term[1:-1], "[\x20-\x7f]+"
-
-        raise InvalidSyntax(term)
+        # <foo>
+        if re.match("^<\w+?>$", term):
+            return term[1:-1], "[cd\x20-\x7f]+"
+        # <foo>|
+        elif re.match("^<\w+?>\|$", term):
+            _, regex = inner(term[:-1])
+            return term[1:-2], "{0}\x00".format(regex)
+        # <foo|>
+        elif re.match("^<\w+?\|>$", term):
+            return term[1:-2], "[\x20-\x7f\x00]+"
+        # <foo>|*
+        elif re.match("^<\w+?>\|\*$", term):
+            _, regex = inner(term[:-1])
+            return term[1:-3], "(?:{0})*".format(regex)
+        # <foo>|+
+        elif re.match("^<\w+?>\|\+", term):
+            _, regex = inner(term[:-1])
+            return term[1:-3], "(?:{0})+".format(regex)
+        else:
+            raise InvalidTerm(term)
 
     # .. note:: regex pattern is converted to `bytes`, since all XenStore
     #           values are expected to by bytestrings.
