@@ -97,8 +97,7 @@ def spec(*terms):
 
         @wraps(func)
         def inner(self, *args):
-            values = dict(zip(argspec.args[1:], args))
-            for arg, value in values.iteritems():
+            for arg, value in zip(argspec.args[1:], args):
                 if not isinstance(value, bytes):
                     raise TypeError("'bytes' expected, got {0!r}"
                                     .format(value.__class__.__name__))
@@ -107,7 +106,7 @@ def spec(*terms):
                 elif arg in patterns:
                     validate_spec(patterns[arg], value)
 
-            return func(self, **values)
+            return func(self, *args)
         return inner
     return decorator
 

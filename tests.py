@@ -129,7 +129,7 @@ def test_validate_path():
 
 def test_spec():
     @spec("<a|>", "<b>|+", "<c>")
-    def foo(a, b, c):
+    def foo(self, a, b, c):
         return True
 
     # a) checking that ``__doc__`` atribute is updated.
@@ -139,7 +139,7 @@ def test_spec():
     for args in [("foo\x00", "bar\x00", "baz"),
                  ("foo\x00", "bar\x00baz\x00", "baz")]:
         try:
-            assert foo(*args)
+            assert foo(None, *args)
         except ValueError:
             pytest.fail("No error should've been raised for {0}"
                         .format(args))
@@ -149,7 +149,7 @@ def test_spec():
                  ("foo\x00", "bar\x00baz", "baz"),
                  ("foo\x00", "bar\x00baz", "\x00")]:
         with pytest.raises(ValueError):
-            foo(*args)
+            foo(None, *args)
 
     with pytest.raises(TypeError):
-        foo("foo", "bar", None)
+        foo(None, "foo", "bar\x00", None)
