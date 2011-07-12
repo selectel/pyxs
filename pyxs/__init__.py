@@ -126,7 +126,7 @@ class Connection(object):
         if re.match(r"^E[A-Z]+\x00$", packet.payload):
             raise RuntimeError(packet.payload[:-1])
 
-        return packet
+        return packet.payload.rstrip("\x00")
 
     # Public API.
     # ...........
@@ -158,14 +158,22 @@ class Connection(object):
         """
         return self.command(Op.RM, path + "\x00")
 
-    def debug(self, *args):
-        """A simple echo call.
-
-        **Syntax**::
-
-          "print"|<string>|??           sends <string> to debug log
-          "print"|<thing-with-no-null>  EINVAL
-          "check"|??                    check xenstored internals
-          <anything-else|>              no-op (future extension)
+    @spec("<path>|")
+    def directory(self, path):
+        """Returns a list of names of the immediate children of `path`.
+        The resulting children are each named as
+        ``<path>/<child-leaf-name>``.
         """
-        return self.command(Op.DEBUG, *args)
+        return self.command(Op.DIRECTORY, path + "\x00").split("\x00")
+
+    @spec("<path>|")
+    def get_perms(self, path):
+        """Returns a list of permissions for a given `path`, where each
+        item is one of the following::
+
+            w<domid>	write only
+            r<domid>	read only
+            b<domid>	both read and write
+            n<domid>	no access
+        """
+        return self.command(Op.GET_PERMS, path + "\x00").split("\x00")
