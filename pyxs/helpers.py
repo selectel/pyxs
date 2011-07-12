@@ -96,14 +96,16 @@ def spec(*terms):
                        reversed(argspec.defaults or ()))
 
         @wraps(func)
-        def inner(*values):
-            for arg, value in chain(zip(argspec.args, values), defaults):
+        def inner(*args):
+            values = dict(chain(defaults, zip(argspec.args, args)))
+
+            for arg, value in values.iteritems():
                 if arg == "path":
                     validate_path(value)
                 elif arg in patterns:
                     validate_spec(patterns[arg], value)
 
-            return func(*values)
+            return func(**values)
         return inner
     return decorator
 
