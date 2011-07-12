@@ -14,7 +14,7 @@ import errno
 import re
 import socket
 
-from . import Packet, Op
+from ._internal import Packet, Op
 from .helpers import spec
 from .exceptions import ConnectionError
 
@@ -76,12 +76,19 @@ class UnixSocketConnection(object):
 
 
 class Client(object):
+    """XenStore client -- <useful comment>.
+
+    :param str unix_socket_path: path to XenStore Unix domain socket,
+                                 usually something like
+                                 ``/var/run/xenstored/socket``.
+    :param float socket_timeout: see :func:`socket.settimeout` for
+                                 details.
+    """
     def __init__(self, unix_socket_path, socket_timeout=None):
         self.connection = UnixSocketConnection(unix_socket_path,
                                                socket_timeout=socket_timeout)
 
     def __enter__(self):
-        self.connection.connect()
         return self
 
     def __exit__(self, *exc_info):

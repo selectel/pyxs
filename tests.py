@@ -4,7 +4,7 @@ import string
 
 import pytest
 
-from pyxs import Op, Packet
+from pyxs._internal import Op, Packet
 from pyxs.exceptions import InvalidOperation, InvalidPayload, InvalidPath, InvalidTerm
 from pyxs.helpers import compile, spec, validate_path
 
