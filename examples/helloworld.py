@@ -12,29 +12,25 @@ from pyxs import Connection
 
 c = Connection("/var/run/xenstored/socket")
 
-# a) debug just prints a given value to ``xenstored`` debug log.
-p = c.debug("print", "hello world!" + "\x00")
-print(p.payload)  # ==> "OK"
-
-# b) read.
-p = c.read("/local/domain/0/domid")
+# a) read.
+p = c.read(b"/local/domain/0/domid")
 print(p.payload)  # ==> 0, which is just what we expect.
 
-# c) write-read.
-p = c.write("/foo/bar", "baz")
-p = c.read("/foo/bar")
+# b) write-read.
+p = c.write(b"/foo/bar", b"baz")
+p = c.read(b"/foo/bar")
 print(p.payload)  # ==> "baz"
 
-# d) exceptions! let's try to read a non-existant path.
+# c) exceptions! let's try to read a non-existant path.
 try:
-    c.read("/path/to/something/useless")
+    c.read(b"/path/to/something/useless")
 except RuntimeError as e:
     print(e)
 
-# e) okay, time to delete that /foo/bar path.
-p = c.rm("/foo/bar")
+# d) okay, time to delete that /foo/bar path.
+p = c.rm(b"/foo/bar")
 
 try:
-    c.read("/foo/bar")
+    c.read(b"/foo/bar")
 except RuntimeError as e:
     print("`/foo/bar` is no moar!")

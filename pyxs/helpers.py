@@ -96,18 +96,18 @@ def spec(*terms):
                  "validation".format(func.__name__))
 
         @wraps(func)
-        def inner(*args):
-            values = dict(zip(argspec.args, args))
+        def inner(self, *args):
+            values = dict(zip(argspec.args[1:], args))
             for arg, value in values.iteritems():
                 if not isinstance(value, bytes):
-                    raise TypeError("`bytes` expected, got {0}"
-                                    .format(type(value)))
+                    raise TypeError("'bytes' expected, got {0!r}"
+                                    .format(value.__class__.__name__))
                 elif arg == "path":
                     validate_path(value)
                 elif arg in patterns:
                     validate_spec(patterns[arg], value)
 
-            return func(**values)
+            return func(self, **values)
         return inner
     return decorator
 
