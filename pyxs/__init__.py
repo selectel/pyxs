@@ -147,7 +147,14 @@ class Connection(object):
             return Packet.from_string("".join(chunks))
 
     def command(self, type, *args):
-        return self.send(type, "\x00".join(args))
+        packet = self.send(type, "\x00".join(args))
+
+        # According to ``xenstore.txt`` erroneus responses start with
+        # a capital E and end with ``NULL``-byte.
+        if re.match(r"^E[A-Z]+\x00$", packet.payload):
+            raise RuntimeError(packet.payload[:-1])
+
+        return packet
 
     @staticmethod
     def validate_path(path):

@@ -24,3 +24,9 @@ print(p.payload)  # ==> 0, which is just what we expect.
 p = c.write("/foo/bar", "baz")
 p = c.read("/foo/bar")
 print(p.payload)  # ==> "baz"
+
+# d) exceptions! let's try to read a non-existant path.
+try:
+    c.read("/path/to/something/useless")
+except RuntimeError as e:
+    print(e)
