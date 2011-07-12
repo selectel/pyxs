@@ -10,11 +10,7 @@ def test_packet():
     with pytest.raises(InvalidOperation):
         Packet(-1, "", 0)
 
-    # b) invalid payload -- forbidden characters.
-    with pytest.raises(InvalidPayload):
-        Packet(Op.DEBUG, "\x15hello world!\x07", 0)
-
-    # c) invalid payload -- maximum size exceeded.
+    # b) invalid payload -- maximum size exceeded.
     with pytest.raises(InvalidPayload):
         Packet(Op.DEBUG, "hello" * 4096, 0)
 

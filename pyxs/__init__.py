@@ -62,9 +62,6 @@ class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
     #: for details.
     _fmt = b"IIII"
 
-    #: ``xsd_sockmsg`` struct size.
-    _fmt_size = struct.calcsize(_fmt)
-
     def __new__(cls, op, payload, req_id, tx_id=None):
         if isinstance(payload, unicode):
             payload = payload.encode("utf-8")
@@ -73,11 +70,7 @@ class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
         # a) payload is limited to 4096 bytes.
         if len(payload) > 4096:
             raise InvalidPayload(payload)
-        # b) xenstore values should normally be 7-bit ASCII text strings
-        #    containing bytes 0x20..0x7f only.
-        if any(c and (c > 0x7f or c < 0x20) for c in imap(ord, payload)):
-            raise InvalidPayload(payload)
-        # c) operation requested is present in ``xsd_sockmsg_type``.
+        # b) operation requested is present in ``xsd_sockmsg_type``.
         if op not in Op:
             raise InvalidOperation(op)
 
@@ -91,8 +84,8 @@ class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
         if isinstance(s, unicode):
             s = s.encode("utf-8")
 
-        type, req_id, tx_id, l = map(int, struct.unpack(cls._fmt,
-                                                        s[:cls._fmt_size]))
+        type, req_id, tx_id, l = map(int,
+            struct.unpack(cls._fmt, s[:struct.calcsize(cls._fmt)]))
         return cls(type, s[-l:], req_id, tx_id)
 
     def __str__(self):
@@ -138,7 +131,8 @@ class Connection(object):
     # ............
 
     def send(self, type, payload):
-        self.socket.send(str(Packet(type, payload)))
+        # .. note:: `req_id` is allways 0 for now.
+        self.socket.send(str(Packet(type, payload, 0)))
 
         chunks, done = [], False
         while not done:
@@ -153,8 +147,9 @@ class Connection(object):
             return Packet.from_string("".join(chunks))
 
     def command(self, type, *args):
-        self.send(type, "\x00".join(args))
+        return self.send(type, "\x00".join(args))
 
+    @staticmethod
     def validate_path(path):
         """Checks if a given path is valid -- that is when it doesn't
         contain any characters other than ASCII alphanumerics and
@@ -166,11 +161,27 @@ class Connection(object):
         """
         # Paths longer than 3072 bytes are forbidden; clients specifying
         # relative paths should keep them to within 2048 bytes.
-        max_len = 3072 if posixpath.abs(path) else 2048
+        max_len = 3072 if posixpath.abspath(path) else 2048
 
         if not (re.match(r"^[a-zA-Z0-9-/_@]+$", path) and
                 len(path) <= max_len):
             raise InvalidPath(path)
+
+    @staticmethod
+    def validate_value(value):
+        """Checks if an given value is valid.
+
+        ::
+
+          xenstore values should normally be 7-bit ASCII text strings
+          containing bytes 0x20..0x7f only, and should not contain a
+          trailing nul byte.
+
+        :param bytes value: value to check.
+        :raises ValueError: when value fails to validate.
+        """
+        if any(c and (c > 0x7f or c < 0x20) for c in imap(ord, value)):
+            raise ValueError(value)
 
     # Public API.
     # ...........
@@ -189,7 +200,8 @@ class Connection(object):
         **Syntax**: ``<path>|<value|>``
         """
         self.validate_path(path)
-        return self.command(Op.WRITE, path, bytes(value))
+        self.validate_value(value)
+        return self.command(Op.WRITE, path, value)
 
     def debug(self, *args):
         """A simple echo call.
@@ -201,4 +213,4 @@ class Connection(object):
           "check"|??                    check xenstored internals
           <anything-else|>              no-op (future extension)
         """
-        return self.command(Op.DEBUG, *map(bytes, args))
+        return self.command(Op.DEBUG, *args)
