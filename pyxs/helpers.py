@@ -15,9 +15,9 @@ __all__ = ["spec"]
 import inspect
 import re
 import posixpath
-from itertools import chain
 from functools import wraps
-from future_builtins import zip, map
+from future_builtins import map, zip
+from warnings import warn
 
 from .exceptions import InvalidSyntax, InvalidPath
 
@@ -88,19 +88,24 @@ def spec(*terms):
               function signature.
     """
     def decorator(func):
+        func.__doc__ = func.__doc__ or ""
         func.__doc__ += "\n**Syntax**: ``{0}``".format("".join(terms))
 
         patterns = compile(*terms)
         argspec  = inspect.getargspec(func)
-        defaults = zip(reversed(argspec.args),
-                       reversed(argspec.defaults or ()))
+
+        if argspec.defaults:
+            warn("{0} uses keyword arguments, not supported by `pyxs`"
+                 "validation".format(func.__name__))
 
         @wraps(func)
         def inner(*args):
-            values = dict(chain(defaults, zip(argspec.args, args)))
-
+            values = dict(zip(argspec.args, args))
             for arg, value in values.iteritems():
-                if arg == "path":
+                if not isinstance(value, bytes):
+                    raise TypeError("`bytes` expected, got {0}"
+                                    .format(type(value)))
+                elif arg == "path":
                     validate_path(value)
                 elif arg in patterns:
                     validate_spec(patterns[arg], value)

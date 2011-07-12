@@ -6,7 +6,7 @@ import pytest
 
 from pyxs import Op, Packet
 from pyxs.exceptions import InvalidOperation, InvalidPayload, InvalidPath
-from pyxs.helpers import compile, validate_path
+from pyxs.helpers import compile, spec, validate_path
 
 
 def test_packet():
@@ -41,6 +41,7 @@ def test_compile():
 
     regex = patterns["foo"]
     assert regex.match("foo")
+    assert not regex.match("foo\x07")
     assert not regex.match("foo\x00")
     assert not regex.match("f\x00oo")
     assert not regex.match("")
@@ -53,6 +54,7 @@ def test_compile():
     assert regex.match("foo")
     assert regex.match("foo\x00")
     assert regex.match("f\x00\x00oo")
+    assert not regex.match("foo\x07")
     assert not regex.match("")
 
     # c) <foo>| -- non-empty string with no NULL bytes, followed by a
@@ -118,3 +120,31 @@ def test_validate_path():
         validate_path("/")
     except InvalidPath:
         pytest.fail("/ is prefectly valid, baby :)")
+
+
+def test_spec():
+    @spec("<a|>", "<b>|+", "<c>")
+    def foo(a, b, c):
+        return True
+
+    # a) checking that ``__doc__`` atribute is updated.
+    assert "**Syntax**" in foo.__doc__
+
+    # b) checking valid argument cases.
+    for args in [("foo\x00", "bar\x00", "baz"),
+                 ("foo\x00", "bar\x00baz\x00", "baz")]:
+        try:
+            assert foo(*args)
+        except ValueError:
+            pytest.fail("No error should've been raised for {0}"
+                        .format(args))
+
+    # c) time for some errors.
+    for args in [("fo\x07o", "bar\x00", "baz"),
+                 ("foo\x00", "bar\x00baz", "baz"),
+                 ("foo\x00", "bar\x00baz", "\x00")]:
+        with pytest.raises(ValueError):
+            foo(*args)
+
+    with pytest.raises(TypeError):
+        foo("foo", "bar", None)
