@@ -15,11 +15,11 @@ __all__ = ["spec"]
 
 def spec(syntax):
     """Decorator, which links a given syntax definition to the wrapped
-    function, by updating it's ``__doc__`` attribute. The following
+    function, by updating its ``__doc__`` attribute. The following
     conventions are used:
 
     =======  ============================================================
-    Syntax   Description
+    Symbol   Description
     =======  ============================================================
     ``|``    A ``NULL`` (zero) byte.
     <foo>    A string guaranteed not to contain any ``NULL`` bytes.
