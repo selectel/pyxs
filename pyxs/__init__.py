@@ -10,13 +10,12 @@
 
 from __future__ import absolute_import, print_function, unicode_literals
 
-import posixpath
 import re
 import socket
 import struct
 from collections import namedtuple
 
-from .exceptions import InvalidOperation, InvalidPayload, InvalidPath
+from .exceptions import InvalidOperation, InvalidPayload
 from .helpers import spec
 
 
@@ -129,63 +128,17 @@ class Connection(object):
 
         return packet
 
-    @staticmethod
-    def validate_path(path):
-        """Checks if a given path is valid -- that is when it doesn't
-        contain any characters other than ASCII alphanumerics and
-        ``-/_@`` and its length doesn't exceed 3072 and 2048 bytes for
-        absolute and relative path respectively.
-
-        :param bytes path: path to check.
-        :raises pyxs.exceptions.InvalidPath: when path fails to validate.
-        """
-        # Paths longer than 3072 bytes are forbidden; clients specifying
-        # relative paths should keep them to within 2048 bytes.
-        max_len = 3072 if posixpath.abspath(path) else 2048
-
-        if not (re.match(r"^[a-zA-Z0-9-/_@]+$", path) and
-                len(path) <= max_len):
-            raise InvalidPath(path)
-
-        # A path is not allowed to have a trailing /, except for the
-        # root path.
-        if len(path) > 1 and path[~1] == b"/":
-            raise InvalidPath(path)
-
-        # A path is not allowed to have ``NULL`` bytes.
-        if b"\x00" in path:
-            raise InvalidPath(path)
-
-    @staticmethod
-    def validate_value(value):
-        """Checks if an given value is valid.
-
-        ::
-
-          xenstore values should normally be 7-bit ASCII text strings
-          containing bytes 0x20..0x7f only, and should not contain a
-          trailing nul byte.
-
-        :param bytes value: value to check.
-        :raises ValueError: when value fails to validate.
-        """
-        if not re.match("^[\x20-\x07f]$"):
-            raise ValueError(value)
-
     # Public API.
     # ...........
 
     @spec("<path>|")
     def read(self, path):
         """Reads the octet string value at a given path."""
-        self.validate_path(path)
         return self.command(Op.READ, path + "\x00")
 
-    @spec("<path>|<value|>")
+    @spec("<path>|", "<value|>")
     def write(self, path, value):
         """Write a value to a given path."""
-        self.validate_path(path)
-        self.validate_value(value)
         return self.command(Op.WRITE, path, value)
 
     @spec("<path>|")
@@ -194,7 +147,6 @@ class Connection(object):
         missing parents with empty values. If `path` or any parent
         already exist, its value is left unchanged.
         """
-        self.validate_path(path)
         return self.command(Op.MKDIR, path + "\x00")
 
     @spec("<path>|")
@@ -204,7 +156,6 @@ class Connection(object):
         it **is** an error if `path`'s immediate parent does not exist
         either.
         """
-        self.validate_path(path)
         return self.command(Op.RM, path + "\x00")
 
     def debug(self, *args):

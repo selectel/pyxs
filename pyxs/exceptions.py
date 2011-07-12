@@ -9,7 +9,9 @@
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
 """
 
-__all__ = frozenset(["InvalidOperation", "InvalidPayload", "InvalidPath"])
+__all__ = frozenset([
+    "InvalidOperation", "InvalidPayload", "InvalidPath", "InvalidSyntax"
+])
 
 
 class InvalidOperation(ValueError):
@@ -38,6 +40,13 @@ class InvalidPath(ValueError):
     * it should only consist of ASCII alphanumerics and the four
       punctuation characters ``-/_@`` -- `hyphen`, `slash`, `underscore`
       and `atsign`.
+    * it shouldn't have a trailing ``/``, except for the root path.
 
     :param bytes path: invalid path value.
 """
+
+
+class InvalidSyntax(ValueError):
+    """Exception raised by :func:`~pyxs.helpers.compile` when a given
+    syntax is invalid, i. e. doesn't match any of the recognized forms.
+    """
