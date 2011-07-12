@@ -18,6 +18,7 @@ from collections import namedtuple
 from itertools import imap
 
 from .exceptions import InvalidOperation, InvalidPayload, InvalidPath
+from .helpers import spec
 
 
 #: Operations supported by XenStore.
@@ -94,34 +95,7 @@ class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
 
 
 class Connection(object):
-    """XenStore connection object.
-
-    The following conventions are used to describe method arguments:
-
-    =======  ============================================================
-    Symbol   Semantics
-    =======  ============================================================
-    ``|``    A ``NULL`` (zero) byte.
-    <foo>    A string guaranteed not to contain any ``NULL`` bytes.
-    <foo|>   Binary data (which may contain zero or more ``NULL`` bytes).
-    <foo>|*  Zero or more strings each followed by a trailing ``NULL``.
-    <foo>|+  One or more strings each followed by a trailing ``NULL``.
-    ?        Reserved value (may not contain ``NULL`` bytes).
-    ??       Reserved value (may contain ``NULL`` bytes).
-    =======  ============================================================
-
-    .. note::
-
-       According to ``docs/misc/xenstore.txt`` in the current
-       implementation reserved values are just empty strings. So for
-       example ``"\\x00\\x00\\x00"`` is a valid ``??`` symbol.
-
-    Here're some examples:
-
-    >>> c = Connection("/var/run/xenstored/socket")
-    >>> c.debug("print", "hello world!", "\x00")
-    _Packet(type=0, req_id=0, tx_id=0, len=3, payload='OK\x00')
-    """
+    """XenStore connection object."""
 
     def __init__(self, addr):
         self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -202,40 +176,34 @@ class Connection(object):
     # Public API.
     # ...........
 
+    @spec("<path>|")
     def read(self, path):
-        """Reads the octet string value at a given path.
-
-        **Syntax**: ``<path>|``
-        """
+        """Reads the octet string value at a given path."""
         self.validate_path(path)
         return self.command(Op.READ, path + "\x00")
 
+    @spec("<path>|<value|>")
     def write(self, path, value):
-        """Write a value to a given path.
-
-        **Syntax**: ``<path>|<value|>``
-        """
+        """Write a value to a given path."""
         self.validate_path(path)
         self.validate_value(value)
         return self.command(Op.WRITE, path, value)
 
+    @spec("<path>|")
     def mkdir(self, path):
         """Ensures that a given path exists, by creating it and any
         missing parents with empty values. If `path` or any parent
         already exist, its value is left unchanged.
-
-        **Syntax**: ``<path>|``
         """
         self.validate_path(path)
         return self.command(Op.MKDIR, path + "\x00")
 
+    @spec("<path>|")
     def rm(self, path):
         """Ensures that a given does not exist, by deleting it and all
         of its children. It is not an error if `path` doesn't exist, but
         it **is** an error if `path`'s immediate parent does not exist
         either.
-
-        **Syntax**: ``<path>|``
         """
         self.validate_path(path)
         return self.command(Op.RM, path + "\x00")
