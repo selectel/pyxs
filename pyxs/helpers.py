@@ -22,40 +22,93 @@ from warnings import warn
 from .exceptions import InvalidTerm, InvalidPath
 
 
-def compile(*terms):
-    """Compiles a given list of terms to a mapping of argument names
-    to validation regexes.
+# Tiny little helpers.
+
+def compose(*fs):
+    """Compose any number of one-argument functions into a single one.
+
+    >>> f = compose(sum, lambda x: x + 10)
+    >>> f([1, 2, 3])
+    16
+    """
+    return lambda x: reduce(lambda x, f: f(x), fs, x)
+
+
+def many(f):
+    """Convert a one-argument predicate function to a function, which
+    takes a various number of arguments and return ``True`` only when
+    predicate is truthy for each of them; otherwise ``False`` is
+    returned.
+
+    >>> f = many(lambda x: x > 5)
+    >>> f([1, 5, 9])
+    False
+    >>> f([11, 15, 19])
+    True
+    """
+    return lambda xs: len(xs) and many_or_none(f)(xs)
+
+
+def many_or_none(f):
+    """Convert a one-argument predicate function to a gunction, which
+    takes a various number of arguments and returns ``True`` when
+    predicate is truty for each of them or no arguments were provided;
+    otherwise ``False`` is returned.
+
+    >>> f = many_or_none(lambda x: x > 5)
+    >>> f([])
+    True
+    >>> f([11, 15, 19])
+    True
+    """
+    return lambda xs: all(map(f, xs))
+
+
+re_term = re.compile("""(?x)
+    ^<
+      (?P<name>\w+?)
+      (?P<null_allowed>\|)?
+     >
+      (?P<null_ending>\|)?
+      (?P<repeat>[+*])?
+    $""")
+
+
+def compile(term):
+    """Compiles a given term to a name-validator pair, where validator
+    is a function of a single argument, capable of validating values
+    for `name`.
 
     .. note:: `reserved` values aren't compiled, since there aren't
               used anywhere but in the DEBUG operation, which is not
               a priority.
     """
-    def inner(term):
-        # <foo>
-        if re.match("^<\w+?>$", term):
-            return term[1:-1], "[cd\x20-\x7f]+"
-        # <foo>|
-        elif re.match("^<\w+?>\|$", term):
-            _, regex = inner(term[:-1])
-            return term[1:-2], "{0}\x00".format(regex)
-        # <foo|>
-        elif re.match("^<\w+?\|>$", term):
-            return term[1:-2], "[\x20-\x7f\x00]+"
-        # <foo>|*
-        elif re.match("^<\w+?>\|\*$", term):
-            _, regex = inner(term[:-1])
-            return term[1:-3], "(?:{0})*".format(regex)
-        # <foo>|+
-        elif re.match("^<\w+?>\|\+", term):
-            _, regex = inner(term[:-1])
-            return term[1:-3], "(?:{0})+".format(regex)
+    match = re_term.match(term)
+
+    if not match:
+        raise InvalidTerm(term)
+    else:
+        (name,          # Argument name.
+         null_allowed,  # Values are allowed to contain NULLs.
+         null_ending,   # Values are allowed to have a trailing NULL.
+         repeat         # Do we need to repeat previous pattern?
+         ) = match.groups()
+
+        regex = re.compile("^{0}+?{1}$".format(
+            "[\x20-\x7f\x00]" if null_allowed else "[\x20-\x7f]",
+            "\x00" if null_ending else ""
+        ).encode("utf-8"))
+
+        if not repeat:
+            v = regex.match
+        elif repeat == "+":
+            v = many(regex.match)
+        elif repeat == "*":
+            v = many_or_none(regex.match)
         else:
             raise InvalidTerm(term)
 
-    # .. note:: regex pattern is converted to `bytes`, since all XenStore
-    #           values are expected to by bytestrings.
-    return dict((name, re.compile("^{0}$".format(t).encode("utf-8")))
-                for name, t in map(inner, terms))
+        return name, v
 
 
 def spec(*terms):
@@ -88,7 +141,7 @@ def spec(*terms):
         func.__doc__ = func.__doc__ or ""
         func.__doc__ += "\n**Syntax**: ``{0}``".format("".join(terms))
 
-        patterns = compile(*terms)
+        patterns = dict(map(compile, terms))
         argspec  = inspect.getargspec(func)
 
         if argspec.defaults:
@@ -98,32 +151,16 @@ def spec(*terms):
         @wraps(func)
         def inner(self, *args):
             for arg, value in zip(argspec.args[1:], args):
-                if not isinstance(value, bytes):
-                    raise TypeError("'bytes' expected, got {0!r}"
-                                    .format(value.__class__.__name__))
-                elif arg == "path":
-                    validate_path(value)
-                elif arg in patterns:
-                    validate_spec(patterns[arg], value)
+                if arg in patterns and not patterns[arg](value):
+                    raise ValueError(value)
+
+                # `path` is somewhat an exception, since it's the only
+                # argument, which requires extra-validation.
+                if arg == "path": validate_path(value)
 
             return func(self, *args)
         return inner
     return decorator
-
-
-# Custom validators.
-
-
-def validate_spec(spec, value):
-    """Checks if a given value matches the spec, see :func:`spec` for
-    details.
-
-    :param spec: a regular expression to match the value against.
-    :param bytes value: a value to check.
-    :raises ValueError: when value fails to validate.
-    """
-    if not spec.match(value):
-        raise ValueError(value)
 
 
 def validate_path(path):

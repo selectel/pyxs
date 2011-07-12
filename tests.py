@@ -36,61 +36,51 @@ def test_packet_from_string():
 
 def test_compile():
     # a) <foo> -- non-empty string with no NULL bytes.
-    patterns = compile("<foo>")
-    assert "foo" in patterns
-
-    regex = patterns["foo"]
-    assert regex.match("foo")
-    assert not regex.match("foo\x07")
-    assert not regex.match("foo\x00")
-    assert not regex.match("f\x00oo")
-    assert not regex.match("")
+    name, v = compile("<foo>")
+    assert name == "foo"
+    assert v("foo")
+    assert not v("foo\x07")
+    assert not v("foo\x00")
+    assert not v("f\x00oo")
+    assert not v("")
 
     # b) <foo|> -- non-empty string with zero or more NULL bytes.
-    patterns = compile("<foo|>")
-    assert "foo" in patterns
-
-    regex = patterns["foo"]
-    assert regex.match("foo")
-    assert regex.match("foo\x00")
-    assert regex.match("f\x00\x00oo")
-    assert not regex.match("foo\x07")
-    assert not regex.match("")
+    name, v = compile("<foo|>")
+    assert name == "foo"
+    assert v("foo")
+    assert v("foo\x00")
+    assert v("f\x00\x00oo")
+    assert not v("foo\x07")
+    assert not v("")
 
     # c) <foo>| -- non-empty string with no NULL bytes, followed by a
     #    trailing NULL.
-    patterns = compile("<foo>|")
-    assert "foo" in patterns
-
-    regex = patterns["foo"]
-    assert regex.match("foo\x00")
-    assert not regex.match("\x00")
-    assert not regex.match("f\x00oo\x00")
-    assert not regex.match("")
+    name, v = compile("<foo>|")
+    assert name == "foo"
+    assert v("foo\x00")
+    assert not v("\x00")
+    assert not v("f\x00oo\x00")
+    assert not v("")
 
     # d) <foo>|* -- zero or more non-empty strings with no NULL bytes,
     #    followed by a trailing NULL.
-    patterns = compile("<foo>|*")
-    assert "foo" in patterns
-
-    regex = patterns["foo"]
-    assert regex.match("")
-    assert regex.match("foo\x00")
-    assert regex.match("foo\x00bar\x00")
-    assert not regex.match("foo\x00bar\x00\x00")
-    assert not regex.match("\x00")
+    name, v = compile("<foo>|*")
+    assert name == "foo"
+    assert v([])
+    assert v(["foo\x00"])
+    assert v(["foo\x00", "bar\x00"])
+    assert not v(["foo\x00", "bar\x00", "\x00"])
+    assert not v(["\x00"])
 
     # e) <foo>|+ -- one or more non-empty strings with no NULL bytes,
     #    followed by a trailing NULL.
-    patterns = compile("<foo>|+")
-    assert "foo" in patterns
-
-    regex = patterns["foo"]
-    assert regex.match("foo\x00")
-    assert regex.match("foo\x00bar\x00")
-    assert not regex.match("foo\x00bar\x00\x00")
-    assert not regex.match("\x00")
-    assert not regex.match("")
+    name, v = compile("<foo>|+")
+    assert name == "foo"
+    assert v(["foo\x00"])
+    assert v(["foo\x00", "bar\x00"])
+    assert not v(["foo\x00", "bar\x00", "\x00"])
+    assert not v(["\x00"])
+    assert not v([])
 
     # f) invalid term syntax.
     for term in ["<foo", "<foo><bar>", "<foo >"]:
@@ -136,8 +126,8 @@ def test_spec():
     assert "**Syntax**" in foo.__doc__
 
     # b) checking valid argument cases.
-    for args in [("foo\x00", "bar\x00", "baz"),
-                 ("foo\x00", "bar\x00baz\x00", "baz")]:
+    for args in [("foo\x00", ["bar\x00"], "baz"),
+                 ("foo\x00", ["bar\x00", "baz\x00"], "baz")]:
         try:
             assert foo(None, *args)
         except ValueError:
@@ -145,11 +135,8 @@ def test_spec():
                         .format(args))
 
     # c) time for some errors.
-    for args in [("fo\x07o", "bar\x00", "baz"),
-                 ("foo\x00", "bar\x00baz", "baz"),
-                 ("foo\x00", "bar\x00baz", "\x00")]:
+    for args in [("fo\x07o", ["bar\x00"], "baz"),
+                 ("foo\x00", [], "baz"),
+                 ("foo\x00", [], "\x00")]:
         with pytest.raises(ValueError):
             foo(None, *args)
-
-    with pytest.raises(TypeError):
-        foo(None, "foo", "bar\x00", None)
