@@ -19,7 +19,7 @@ from functools import wraps
 from future_builtins import map, zip
 from warnings import warn
 
-from .exceptions import InvalidTerm, InvalidPath
+from .exceptions import InvalidTerm, InvalidPath, InvalidPermission
 
 
 # Tiny little helpers.
@@ -154,11 +154,12 @@ def spec(*terms):
                 if arg in patterns and not patterns[arg](value):
                     raise ValueError(value)
 
-                # `path` is somewhat an exception, since it's the only
-                # argument, which requires extra-validation.
-                if arg == "path": validate_path(value)
-
-            return func(self, *args)
+                # There's a bunch of 'special' arguments which require
+                # extra validation, for instance 'path' and 'perms'.
+                if arg in extra_validators:
+                    extra_validators[arg](value)
+            else:
+                return func(self, *args)
         return inner
     return decorator
 
@@ -182,3 +183,23 @@ def validate_path(path):
     # root path.
     if len(path) > 1 and path[-1] == b"/":
         raise InvalidPath(path)
+
+
+def validate_perms(perms):
+    """Checks if a given list of permision follows the format described
+    in :meth:`~pyxs.client.Client.get_perms`.
+
+    :param list perms: permissions to check.
+    :raises pyxs.exceptions.InvalidPermissions:
+        when any of the permissions fail to validate.
+    """
+    for perm in perms:
+        if not re.match("[wrbn]\d+"):
+            raise InvalidPermission(perm)
+
+
+#: A dictionary of extra validators for some variable names.
+extra_validators = {
+    "path": validate_path,
+    "perms": validate_perms
+}

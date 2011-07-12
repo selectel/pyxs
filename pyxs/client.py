@@ -156,12 +156,16 @@ class Client(object):
 
     @spec("<path>|")
     def get_perms(self, path):
-        """Returns a list of permissions for a given `path`, where each
-        item is one of the following::
-
-            w<domid>	write only
-            r<domid>	read only
-            b<domid>	both read and write
-            n<domid>	no access
+        """Returns a list of permissions for a given `path`, see
+        :exc:`~pyxs.exceptions.InvalidPermission` for details on
+        permission format.
         """
         return self.command(Op.GET_PERMS, path + "\x00").split("\x00")
+
+    @spec("<path>|", "<perms>|+")
+    def set_perms(self, path, perms):
+        """Sets a access permissions for a given `path`, see
+        :exc:`~pyxs.exceptions.InvalidPermission` for details on
+        permission format.
+        """
+        return self.command(Op.SET_PERMS, path, *perms)
