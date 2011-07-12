@@ -174,6 +174,15 @@ class Connection(object):
                 len(path) <= max_len):
             raise InvalidPath(path)
 
+        # A path is not allowed to have a trailing /, except for the
+        # root path.
+        if len(path) > 1 and path[~1] == b"/":
+            raise InvalidPath(path)
+
+        # A path is not allowed to have ``NULL`` bytes.
+        if b"\x00" in path:
+            raise InvalidPath(path)
+
     @staticmethod
     def validate_value(value):
         """Checks if an given value is valid.
@@ -209,6 +218,27 @@ class Connection(object):
         self.validate_path(path)
         self.validate_value(value)
         return self.command(Op.WRITE, path, value)
+
+    def mkdir(self, path):
+        """Ensures that a given path exists, by creating it and any
+        missing parents with empty values. If `path` or any parent
+        already exist, its value is left unchanged.
+
+        **Syntax**: ``<path>|``
+        """
+        self.validate_path(path)
+        return self.command(Op.MKDIR, path + "\x00")
+
+    def rm(self, path):
+        """Ensures that a given does not exist, by deleting it and all
+        of its children. It is not an error if `path` doesn't exist, but
+        it **is** an error if `path`'s immediate parent does not exist
+        either.
+
+        **Syntax**: ``<path>|``
+        """
+        self.validate_path(path)
+        return self.command(Op.RM, path + "\x00")
 
     def debug(self, *args):
         """A simple echo call.

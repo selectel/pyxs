@@ -16,11 +16,11 @@ c = Connection("/var/run/xenstored/socket")
 p = c.debug("print", "hello world!" + "\x00")
 print(p.payload)  # ==> "OK"
 
-# b) read
+# b) read.
 p = c.read("/local/domain/0/domid")
 print(p.payload)  # ==> 0, which is just what we expect.
 
-# c) write
+# c) write-read.
 p = c.write("/foo/bar", "baz")
 p = c.read("/foo/bar")
 print(p.payload)  # ==> "baz"
@@ -30,3 +30,11 @@ try:
     c.read("/path/to/something/useless")
 except RuntimeError as e:
     print(e)
+
+# e) okay, time to delete that /foo/bar path.
+p = c.rm("/foo/bar")
+
+try:
+    c.read("/foo/bar")
+except RuntimeError as e:
+    print("`/foo/bar` is no moar!")
