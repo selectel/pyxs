@@ -15,7 +15,6 @@ import re
 import socket
 import struct
 from collections import namedtuple
-from itertools import imap
 
 from .exceptions import InvalidOperation, InvalidPayload, InvalidPath
 from .helpers import spec
@@ -123,7 +122,7 @@ class Connection(object):
     def command(self, type, *args):
         packet = self.send(type, "\x00".join(args))
 
-        # According to ``xenstore.txt`` erroneus responses start with
+        # According to ``xenstore.txt`` erroneous responses start with
         # a capital E and end with ``NULL``-byte.
         if re.match(r"^E[A-Z]+\x00$", packet.payload):
             raise RuntimeError(packet.payload[:-1])
@@ -170,7 +169,7 @@ class Connection(object):
         :param bytes value: value to check.
         :raises ValueError: when value fails to validate.
         """
-        if any(c and (c > 0x7f or c < 0x20) for c in imap(ord, value)):
+        if not re.match("^[\x20-\x07f]$"):
             raise ValueError(value)
 
     # Public API.
