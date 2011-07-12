@@ -50,3 +50,7 @@ class InvalidTerm(SyntaxError):
     """Exception raised by :func:`~pyxs.helpers.compile` when a given
     term is invalid, i. e. doesn't match any of the recognized forms.
     """
+
+
+class ConnectionError(Exception):
+    """Exception raised for failures during socket operations."""

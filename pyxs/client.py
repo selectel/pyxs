@@ -10,26 +10,58 @@
 """
 
 
+import errno
 import re
 import socket
 
 from . import Packet, Op
 from .helpers import spec
+from .exceptions import ConnectionError
 
 
-class Client(object):
+class UnixSocketConnection(object):
+    def __init__(self, path="", socket_timeout=None):
+        self.path = ""
+        self.socket = None
+        self.socket_timeout = None
 
-    def __init__(self, addr):
-        self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.socket.connect(addr)
+    def connect(self):
+        if self.socket:
+            return
 
-    # Private API.
-    # ............
+        try:
+            self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.socket.settimeout(self.socket_timeout)
+            self.socket.connect(self.path)
+        except socket.error as e:
+            raise ConnectionError("Error connecting to {0}: {1}"
+                                  .format(self.path, e))
 
-    def send(self, type, payload):
-        # .. note:: `req_id` is allways 0 for now.
-        self.socket.send(str(Packet(type, payload, 0)))
+    def disconnect(self):
+        if self.socket is None:
+            return
 
+        try:
+            self.socket.close()
+        except socket.error:
+            pass
+
+        self.socket = None
+
+    def send(self, data):
+        if not self.socket:
+            self.connect()
+
+        try:
+            return self.socket.send(data)
+        except socket.error as e:
+            if e.args[0] is errno.EPIPE:
+                self.disconnect()
+
+            raise ConnectionError("Error {0} while writing to socket: {1}"
+                                  .format(e.args))
+
+    def recv(self):
         chunks, done = [], False
         while not done:
             try:
@@ -40,7 +72,29 @@ class Client(object):
                 chunks.append(data)
                 done = len(data) <= 1024
         else:
-            return Packet.from_string("".join(chunks))
+            return "".join(chunks)
+
+
+class Client(object):
+    def __init__(self, unix_socket_path, socket_timeout=None):
+        self.connection = UnixSocketConnection(unix_socket_path,
+                                               socket_timeout=socket_timeout)
+
+    def __enter__(self):
+        self.connection.connect()
+        return self
+
+    def __exit__(self, *exc_info):
+        if not any(exc_info):
+            self.connection.disconnect()
+
+    # Private API.
+    # ............
+
+    def send(self, type, payload):
+        # .. note:: `req_id` is allways 0 for now.
+        self.connection.send(str(Packet(type, payload, req_id=0)))
+        return Packet.from_string("".join(self.connection.recv()))
 
     def command(self, type, *args):
         packet = self.send(type, "\x00".join(args))
