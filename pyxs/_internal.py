@@ -8,6 +8,10 @@
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
 """
 
+from __future__ import unicode_literals
+
+__all__ = ["Op", "Packet"]
+
 import struct
 from collections import namedtuple
 
@@ -15,7 +19,7 @@ from .exceptions import InvalidOperation, InvalidPayload
 
 
 #: Operations supported by XenStore.
-Op = namedtuple("Operation", [
+Operations = Op = namedtuple("Operations", [
     "DEBUG",
     "DIRECTORY",
     "READ",

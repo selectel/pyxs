@@ -9,9 +9,9 @@
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
 """
 
-__all__ = frozenset([
+__all__ = [
     "InvalidOperation", "InvalidPayload", "InvalidPath", "InvalidTerm"
-])
+]
 
 
 class InvalidOperation(ValueError):
@@ -49,8 +49,13 @@ class InvalidPath(ValueError):
 class InvalidTerm(SyntaxError):
     """Exception raised by :func:`~pyxs.helpers.compile` when a given
     term is invalid, i. e. doesn't match any of the recognized forms.
+
+    :param bytes term: invalid term value.
     """
 
 
 class ConnectionError(Exception):
-    """Exception raised for failures during socket operations."""
+    """Exception raised for failures during socket operations.
+
+    :param str path: detailed error message.
+    """
