@@ -10,7 +10,7 @@
 
 from __future__ import unicode_literals
 
-__all__ = ["spec"]
+__all__ = ["spec", "compile", "compose", "many", "many_or_none"]
 
 import inspect
 import re

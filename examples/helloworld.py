@@ -8,9 +8,9 @@
 
 from __future__ import unicode_literals, print_function
 
-from pyxs import Connection
+from pyxs import Client
 
-c = Connection("/var/run/xenstored/socket")
+c = Client("/var/run/xenstored/socket")
 
 # a) read.
 print(c.read(b"/local/domain/0/domid"))  # ==> 0, which is just what we expect.
