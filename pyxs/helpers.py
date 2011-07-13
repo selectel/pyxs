@@ -71,9 +71,10 @@ def compile(term):
 
 
 def spec(*terms):
-    """Decorator, which links a given syntax definition to the wrapped
-    function, by updating its ``__doc__`` attribute. The following
-    conventions are used:
+    """Decorator, which links a given spec to the wrapped function,
+    by updating its ``__spec__`` attribute with a list of validators
+    for each spec term. The following symbols can be used in term
+    definitions:
 
     =======  ============================================================
     Symbol   Description
@@ -94,8 +95,6 @@ def spec(*terms):
        example ``"\\x00\\x00\\x00"`` is a valid ``??`` symbol.
     """
     def decorator(func):
-        func.__doc__ = func.__doc__ or ""
-        func.__doc__ += "\n**Syntax**: ``{0}``".format("".join(terms))
         func.__spec__ = list(map(compile, terms))
 
         @wraps(func)

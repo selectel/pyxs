@@ -114,8 +114,9 @@ def test_spec():
     def foo(self, a, b, c):
         return True
 
-    # a) checking that ``__doc__`` atribute is updated.
-    assert "**Syntax**" in foo.__doc__
+    # a) checking that ``__spec__`` atribute is updated.
+    assert hasattr(foo, "__spec__")
+    assert len(foo.__spec__) == 3
 
     # b) checking valid argument cases.
     for args in [("foo\x00", ["bar\x00"], "baz"),
