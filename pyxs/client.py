@@ -204,7 +204,7 @@ class Client(object):
 
     @spec("<domid>|")
     def is_domain_introduced(self, domid):
-        """Returns ``True` if ``xenstored` is in communication with
+        """Returns ``True` if ``xenstored`` is in communication with
         the domain; that is when `INTRODUCE` for the domain has not
         yet been followed by domain destruction or explicit
         `RELEASE`; and ``False`` otherwise.
@@ -213,3 +213,41 @@ class Client(object):
             "T": True,
             "F": False
         }.get(self.command(Op.IS_DOMAIN_INTRODUCED, domid))
+
+    @spec("<domid>|", "<mfn>|", "<eventchn>|")
+    def introduce(self, domid, mfn, eventchn):
+        """Tells ``xenstored`` to communicate with this domain.
+
+        :param int domid: a real domain id, (``0`` is forbidden).
+        :param long mfn: address of xenstore page in `domid`.
+        :param int eventch: an unbound event chanel in `domid`.
+        """
+        return self.command(Op.INTRODUCE, domid, mfn, eventchn)
+
+    @spec("<domid>|")
+    def release(self, domid):
+        """Manually requests ``xenstored`` to disconnect from the
+        domain.
+
+        .. note:: ``xenstored`` will in any case detect domain
+                  destruction and disconnect by itself.
+        """
+        return self.command(Op.RELEASE, domid)
+
+    @spec("<domid>|")
+    def resume(self, domid):
+        """Tells ``xenstored`` to clear its shutdown flag for a
+        domain. This ensures that a subsequent shutdown will fire the
+        appropriate watches.
+        """
+        return self.command(Op.RESUME, domid)
+
+    @spec("<domid>|", "<tdomid>|")
+    def set_target(self, domid, target):
+        """Tells ``xenstored`` that a domain is tartetting another one,
+        so it should let it tinker with it. This grants domain `domid`
+        full access to paths owned by `target`. Domain `domid` also
+        inherits all permissions granted to `target` on all other
+        paths.
+        """
+        return self.command(Op.SET_TARGET, domid, target)
