@@ -14,6 +14,7 @@ from __future__ import absolute_import
 __all__ = ["Client"]
 
 import errno
+import os
 import re
 import socket
 
@@ -23,7 +24,16 @@ from .exceptions import ConnectionError
 
 
 class UnixSocketConnection(object):
-    def __init__(self, path="", socket_timeout=None):
+    def __init__(self, path=None, socket_timeout=None):
+        if path is None:
+            # If path is not provided explicitly, fetching it from the
+            # environment, similar to what `libxs` does.
+            path = (
+                os.getenv("XENSTORED_PATH") or
+                os.path.join(os.getenv("XENSTORED_RUNDIR",
+                                       "/var/run/xenstored"), "socket")
+            )
+
         self.path = path
         self.socket = None
         self.socket_timeout = None
@@ -87,7 +97,7 @@ class Client(object):
     :param float socket_timeout: see :func:`socket.settimeout` for
                                  details.
     """
-    def __init__(self, unix_socket_path, socket_timeout=None):
+    def __init__(self, unix_socket_path=None, socket_timeout=None):
         self.connection = UnixSocketConnection(unix_socket_path,
                                                socket_timeout=socket_timeout)
 

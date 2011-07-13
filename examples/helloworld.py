@@ -11,7 +11,7 @@ from __future__ import unicode_literals, print_function
 from pyxs import Client
 
 
-with Client("/var/run/xenstored/socket") as c:
+with Client() as c:
     # a) read.
     print(
         c.read(b"/local/domain/0/domid")
@@ -42,7 +42,8 @@ with Client("/var/run/xenstored/socket") as c:
     # f) let's watch some paths!
     c.write(b"/foo/bar", b"baz")
     print(c.watch(b"/foo/bar", "baz"))
-    print(c.watch_event())  # No do `$ xenstore-write /foo/bar <anything>`.
+    print("Watching ... do `$ xenstore-write /foo/bar <anything>`.")
+    print(c.watch_event())
     print(c.unwatch(b"/foo/bar", "baz"))
 
     # g) domain managment commands.
