@@ -56,7 +56,7 @@ class UnixSocketConnection(object):
             self.connect()
 
         try:
-            return self.socket.send(data)
+            return self.socket.sendall(data)
         except socket.error as e:
             if e.args[0] is errno.EPIPE:
                 self.disconnect()
@@ -95,8 +95,7 @@ class Client(object):
         return self
 
     def __exit__(self, *exc_info):
-        if not any(exc_info):
-            self.connection.disconnect()
+        self.connection.disconnect()
 
     # Private API.
     # ............
