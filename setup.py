@@ -42,7 +42,7 @@ class PyTest(Command):
     initialize_options = finalize_options = lambda self: None
 
     def run(self):
-        errno = subprocess.call([sys.executable, "runtests.py"])
+        errno = subprocess.call([sys.executable, "runtests.py", "tests.py"])
         raise SystemExit(errno)
 
 
