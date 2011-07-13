@@ -40,5 +40,7 @@ with Client("/var/run/xenstored/socket") as c:
     print(c.get_perms(b"/local/domain/0"))
 
     # f) let's watch some paths!
-    print(c.watch(b"/local/domain/0", "foo"))
-    print(c.unwatch(b"/local/domain/0", "foo"))
+    c.write(b"/foo/bar", b"baz")
+    print(c.watch(b"/foo/bar", "baz"))
+    print(c.watch_event())  # No do `$ xenstore-write /foo/bar <anything>`.
+    print(c.unwatch(b"/foo/bar", "baz"))

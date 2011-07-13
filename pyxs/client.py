@@ -17,7 +17,7 @@ import errno
 import re
 import socket
 
-from ._internal import Packet, Op
+from ._internal import Event, Packet, Op
 from .helpers import spec
 from .exceptions import ConnectionError
 
@@ -185,3 +185,11 @@ class Client(object):
     def unwatch(self, wpath, token):
         """Removes a previously added watch."""
         return self.command(Op.UNWATCH, wpath, token)
+
+    def watch_event(self):
+        """Waits for any of the watched paths to generate an event,
+        which is a pair, where the first element is event path, i.e.
+        the actual path that was modified and second element is a
+        token, passed to the :meth:`watch` command.
+        """
+        return Event(*self.command(Op.WATCH_EVENT).split("\x00"))

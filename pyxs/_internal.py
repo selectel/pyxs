@@ -10,7 +10,7 @@
 
 from __future__ import unicode_literals
 
-__all__ = ["Op", "Packet"]
+__all__ = ["Event", "Op", "Packet"]
 
 import struct
 from collections import namedtuple
@@ -42,6 +42,9 @@ Operations = Op = namedtuple("Operations", [
     "SET_TARGET",
     "RESTRICT"
 ])(*(range(20) + [128]))
+
+
+Event = namedtuple("Event", "path token")
 
 
 class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
