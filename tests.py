@@ -5,8 +5,10 @@ import string
 import pytest
 
 from pyxs._internal import Op, Packet
-from pyxs.exceptions import InvalidOperation, InvalidPayload, InvalidPath, InvalidTerm
-from pyxs.helpers import compile, spec, validate_path
+from pyxs.exceptions import InvalidOperation, InvalidPayload, InvalidPath, \
+    InvalidTerm, InvalidPermission
+from pyxs.helpers import compile, spec, validate_path, validate_wpath, \
+    validate_perms
 
 
 def test_packet():
@@ -105,8 +107,49 @@ def test_validate_path():
 
     try:
         validate_path("/")
-    except InvalidPath:
-        pytest.fail("/ is prefectly valid, baby :)")
+    except InvalidPath as p:
+        pytest.fail("{0} is prefectly valid, baby :)".format(p.args))
+
+
+def test_validate_wpath():
+    # a) ordinary path should be checked with `validate_path()`
+    with pytest.raises(InvalidPath):
+        validate_wpath("/foo/")
+
+    with pytest.raises(InvalidPath):
+        validate_wpath("/fo\x07o")
+
+    with pytest.raises(InvalidPath):
+        validate_wpath("/$/foo")
+
+    # b) special path options are limited to `@introduceDomain` and
+    #    `@releaseDomain`.
+    with pytest.raises(InvalidPath):
+        validate_wpath("@foo")
+
+    try:
+        validate_wpath("@introduceDomain")
+        validate_wpath("@releaseDomain")
+    except InvalidPath as p:
+        pytest.fail("{0} is prefectly valid, baby :)".format(p.args))
+
+
+def test_validate_perms():
+    # a valid permission has a form `[wrbn]:digits:`.
+    with pytest.raises(InvalidPermission):
+        validate_perms(["foo"])
+
+    with pytest.raises(InvalidPermission):
+        validate_perms(["f20"])
+
+    with pytest.raises(InvalidPermission):
+        validate_perms(["r-20"])
+
+    try:
+        validate_perms(["w0", "r0", "b0", "n0"])
+        validate_perms(["w999999"])  # valid, even though it overflows int32.
+    except InvalidPermission as p:
+        pytest.fail("{0} is prefectly valid, baby :)".format(p.args))
 
 
 def test_spec():
@@ -117,6 +160,11 @@ def test_spec():
     # a) checking that ``__spec__`` atribute is updated.
     assert hasattr(foo, "__spec__")
     assert len(foo.__spec__) == 3
+    a, b, c = foo.__spec__
+
+    assert a.null_ending == False
+    assert b.null_ending == True
+    assert c.null_ending == False
 
     # b) checking valid argument cases.
     for args in [("foo\x00", ["bar\x00"], "baz"),

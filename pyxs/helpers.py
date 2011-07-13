@@ -153,7 +153,7 @@ def validate_wpath(wpath):
     :raises pyxs.exceptions.InvalidPath: when path fails to validate.
     """
     if (wpath.startswith("@") and not
-        re.match("^@(?:introduceDomain|releaseDomain)\x00$", wpath)):
+        re.match("^@(?:introduceDomain|releaseDomain)\x00?$", wpath)):
         raise InvalidPath(wpath)
     else:
         validate_path(wpath)
@@ -168,7 +168,7 @@ def validate_perms(perms):
         when any of the permissions fail to validate.
     """
     for perm in perms:
-        if not re.match("[wrbn]\d+"):
+        if not re.match("[wrbn]\d+", perm):
             raise InvalidPermission(perm)
 
 
