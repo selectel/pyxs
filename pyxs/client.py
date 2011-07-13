@@ -169,6 +169,14 @@ class Client(object):
 
     .. note:: :class:`UnixSocketConnection` is used as a fallback value,
               if backend cannot be determined from arguments given.
+
+    Here's a quick example:
+
+    >>> with Client() as c:
+    ...     c.write("/foo/bar", "baz")
+    ...     c.read("/foo/bar")
+    'OK'
+    'baz'
     """
     def __init__(self, xen_bus_path=None, unix_socket_path=None,
                  socket_timeout=None):
