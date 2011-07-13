@@ -263,6 +263,8 @@ class Client(object):
 
         .. note:: ``xenstored`` will in any case detect domain
                   destruction and disconnect by itself.
+
+        .. todo:: make sure it's only executed from Dom0.
         """
         return self.command(Op.RELEASE, domid)
 
@@ -273,6 +275,8 @@ class Client(object):
         appropriate watches.
 
         :param int domid: domain to resume.
+
+        .. todo:: make sure it's only executed from Dom0.
         """
         return self.command(Op.RESUME, domid)
 
@@ -286,5 +290,7 @@ class Client(object):
 
         :param int domid: domain to set target for.
         :param int target: target domain (yours truly, Captain).
+
+        .. todo:: make sure it's only executed from Dom0.
         """
         return self.command(Op.SET_TARGET, domid, target)
