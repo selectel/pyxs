@@ -188,10 +188,10 @@ class Client(object):
 
         # According to ``xenstore.txt`` erroneous responses start with
         # a capital E and end with ``NULL``-byte.
-        if re.match(r"^E[A-Z]+\x00$", packet.payload):
+        if not packet:
             raise RuntimeError(packet.payload[:-1])
-
-        return packet.payload.rstrip("\x00")
+        else:
+            return packet.payload.rstrip("\x00")
 
     # Public API.
     # ...........
