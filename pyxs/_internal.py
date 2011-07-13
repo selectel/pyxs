@@ -85,9 +85,14 @@ class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
         if isinstance(s, unicode):
             s = s.encode("utf-8")
 
-        type, req_id, tx_id, l = map(int,
+        op, req_id, tx_id, l = map(int,
             struct.unpack(cls._fmt, s[:struct.calcsize(cls._fmt)]))
-        return cls(type, s[-l:], req_id, tx_id)
+        return cls(op, s[-l:], req_id, tx_id)
+
+    @classmethod
+    def from_file(cls, f):
+        op, req_id, tx_id, l = map(int, struct.unpack(cls._fmt, f.read(16)))
+        return cls(op, f.read(l), req_id, tx_id)
 
     def __str__(self):
         # Note the ``[:-1]`` slice -- the actual payload is excluded.

@@ -15,6 +15,7 @@ __all__ = ["Client"]
 
 import errno
 import os
+import platform
 import re
 import socket
 
@@ -61,12 +62,12 @@ class UnixSocketConnection(object):
 
         self.socket = None
 
-    def send(self, data):
+    def send(self, packet):
         if not self.socket:
             self.connect()
 
         try:
-            return self.socket.sendall(data)
+            return self.socket.sendall(str(packet))
         except socket.error as e:
             if e.args[0] is errno.EPIPE:
                 self.disconnect()
@@ -85,21 +86,88 @@ class UnixSocketConnection(object):
                 chunks.append(data)
                 done = len(data) <= 1024
         else:
-            return "".join(chunks)
+            return Packet.from_string("".join(chunks))
+
+
+class XenBusConnection(object):
+    def __init__(self, path=None):
+        if path is None:
+            # If path is not provided explicitly, using a predefined
+            # constant for the current OS.
+            system = platform.system()
+
+            if system == "Linux":
+                path = "/proc/xen/xenbus"
+            elif system == "NetBSD":
+                path = "/kern/xen/xenbus"
+            else:
+                path = "/dev/xen/xenbus"
+
+        self.path = path
+        self.fd = None
+
+    def connect(self):
+        if self.fd:
+            return
+
+        try:
+            self.fd = os.open(self.path, os.O_RDWR)
+        except (IOError, OSError) as e:
+            raise ConnectionError("Error while opening {0}: {1}"
+                                  .format(self.path, e))
+
+    def disconnect(self):
+        if self.fd is None:
+            return
+
+        try:
+            os.close(self.fd)
+        except OSError:
+            pass
+
+        self.fd = None
+
+    def send(self, packet):
+        if not self.fd:
+            self.connect()
+
+        try:
+            os.write(self.fd, str(packet))
+        except OSError as e:
+            raise  # .. todo:: convert exception to `pyxs` format.
+
+    def recv(self):
+        try:
+            return Packet.from_file(os.fdopen(self.fd))
+        except OSError as e:
+            raise  # .. todo:: convert exception to `pyxs` format.
+
 
 
 class Client(object):
     """XenStore client -- <useful comment>.
 
+    :param str xen_bus_path: path to XenBus device, implies that
+                             :class:`XenBusConnection` is used as a
+                             backend.
     :param str unix_socket_path: path to XenStore Unix domain socket,
                                  usually something like
-                                 ``/var/run/xenstored/socket``.
+                                 ``/var/run/xenstored/socket`` -- implies
+                                 that :class:`UnixSocketConnection` is
+                                 used as a backend.
     :param float socket_timeout: see :func:`socket.settimeout` for
                                  details.
+
+    .. note:: :class:`UnixSocketConnection` is used as a fallback value,
+              if backend cannot be determined from arguments given.
     """
-    def __init__(self, unix_socket_path=None, socket_timeout=None):
-        self.connection = UnixSocketConnection(unix_socket_path,
-                                               socket_timeout=socket_timeout)
+    def __init__(self, xen_bus_path=None, unix_socket_path=None,
+                 socket_timeout=None):
+        if unix_socket_path or not xen_bus_path:
+            self.connection = UnixSocketConnection(
+                unix_socket_path, socket_timeout=socket_timeout)
+        else:
+            self.connection = XenBusConnection(xen_bus_path)
 
     def __enter__(self):
         return self
@@ -113,7 +181,7 @@ class Client(object):
     def send(self, type, payload):
         # .. note:: `req_id` is allways 0 for now.
         self.connection.send(str(Packet(type, payload, req_id=0)))
-        return Packet.from_string("".join(self.connection.recv()))
+        return self.connection.recv()
 
     def command(self, type, *args):
         packet = self.send(type, "".join(args))
