@@ -24,7 +24,7 @@ from .exceptions import ConnectionError
 
 class UnixSocketConnection(object):
     def __init__(self, path="", socket_timeout=None):
-        self.path = ""
+        self.path = path
         self.socket = None
         self.socket_timeout = None
 
@@ -107,7 +107,7 @@ class Client(object):
         return Packet.from_string("".join(self.connection.recv()))
 
     def command(self, type, *args):
-        packet = self.send(type, "\x00".join(args))
+        packet = self.send(type, "".join(args))
 
         # According to ``xenstore.txt`` erroneous responses start with
         # a capital E and end with ``NULL``-byte.
@@ -122,7 +122,7 @@ class Client(object):
     @spec("<path>|")
     def read(self, path):
         """Reads the octet string value at a given path."""
-        return self.command(Op.READ, path + "\x00")
+        return self.command(Op.READ, path)
 
     @spec("<path>|", "<value|>")
     def write(self, path, value):
@@ -135,7 +135,7 @@ class Client(object):
         missing parents with empty values. If `path` or any parent
         already exist, its value is left unchanged.
         """
-        return self.command(Op.MKDIR, path + "\x00")
+        return self.command(Op.MKDIR, path)
 
     @spec("<path>|")
     def rm(self, path):
@@ -144,7 +144,7 @@ class Client(object):
         it **is** an error if `path`'s immediate parent does not exist
         either.
         """
-        return self.command(Op.RM, path + "\x00")
+        return self.command(Op.RM, path)
 
     @spec("<path>|")
     def directory(self, path):
@@ -152,7 +152,7 @@ class Client(object):
         The resulting children are each named as
         ``<path>/<child-leaf-name>``.
         """
-        return self.command(Op.DIRECTORY, path + "\x00").split("\x00")
+        return self.command(Op.DIRECTORY, path).split("\x00")
 
     @spec("<path>|")
     def get_perms(self, path):
@@ -160,7 +160,7 @@ class Client(object):
         :exc:`~pyxs.exceptions.InvalidPermission` for details on
         permission format.
         """
-        return self.command(Op.GET_PERMS, path + "\x00").split("\x00")
+        return self.command(Op.GET_PERMS, path).split("\x00")
 
     @spec("<path>|", "<perms>|+")
     def set_perms(self, path, perms):
