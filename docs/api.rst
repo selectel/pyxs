@@ -4,8 +4,6 @@
 API reference
 =============
 
-.. automodule:: pyxs
-
 .. automodule:: pyxs.client
     :members:
 

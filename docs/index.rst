@@ -6,6 +6,8 @@
 Welcome to pyxs's documentation!
 ================================
 
+.. automodule:: pyxs
+
 Contents:
 
 .. toctree::
