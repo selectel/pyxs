@@ -81,17 +81,14 @@ class UnixSocketConnection(object):
                                   .format(e.args))
 
     def recv(self):
-        chunks, done = [], False
-        while not done:
-            try:
-                data = self.socket.recv(1024)
-            except socket.error:
-                done = True
-            else:
-                chunks.append(data)
-                done = len(data) <= 1024
-        else:
-            return Packet.from_string("".join(chunks))
+        try:
+            return Packet.from_file(self.socket.makefile())
+        except socket.error as e:
+            if e.args[0] is errno.EPIPE:
+                self.disconnect()
+
+            raise ConnectionError("Error {0} while reading from socket: {1}"
+                                  .format(e.args))
 
 
 class XenBusConnection(object):
@@ -143,14 +140,17 @@ class XenBusConnection(object):
         try:
             os.write(self.fd, str(packet))
         except OSError as e:
-            raise  # .. todo:: convert exception to `pyxs` format.
+            # .. todo:: convert exception to `pyxs` format.
+            raise ConnectionError("Error {0} while writing to XenBus: {1}"
+                                  .format(e.args))
 
     def recv(self):
         try:
             return Packet.from_file(os.fdopen(self.fd))
         except OSError as e:
-            raise  # .. todo:: convert exception to `pyxs` format.
-
+            # .. todo:: convert exception to `pyxs` format.
+            raise ConnectionError("Error {0} while reading from XenBus: {1}"
+                                  .format(e.args))
 
 
 class Client(object):
