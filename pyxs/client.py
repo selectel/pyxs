@@ -121,12 +121,20 @@ class Client(object):
 
     @spec("<path>|")
     def read(self, path):
-        """Reads the octet string value at a given path."""
+        """Reads data from a given path.
+
+        :param str path: a path to read from.
+        """
         return self.command(Op.READ, path)
 
     @spec("<path>|", "<value|>")
     def write(self, path, value):
-        """Write a value to a given path."""
+        """Writes data to a given path.
+
+        :param value: data to write (can be of any type, but will be
+                      coerced to :func:`bytes` eventually).
+        :param str path: a path to write to.
+        """
         return self.command(Op.WRITE, path, value)
 
     @spec("<path>|")
@@ -134,6 +142,8 @@ class Client(object):
         """Ensures that a given path exists, by creating it and any
         missing parents with empty values. If `path` or any parent
         already exist, its value is left unchanged.
+
+        :param str path: path to directory to create.
         """
         return self.command(Op.MKDIR, path)
 
@@ -143,6 +153,8 @@ class Client(object):
         of its children. It is not an error if `path` doesn't exist, but
         it **is** an error if `path`'s immediate parent does not exist
         either.
+
+        :param str path: path to directory to remove.
         """
         return self.command(Op.RM, path)
 
@@ -151,6 +163,8 @@ class Client(object):
         """Returns a list of names of the immediate children of `path`.
         The resulting children are each named as
         ``<path>/<child-leaf-name>``.
+
+        :param str path: path to list.
         """
         return self.command(Op.DIRECTORY, path).split("\x00")
 
@@ -159,6 +173,8 @@ class Client(object):
         """Returns a list of permissions for a given `path`, see
         :exc:`~pyxs.exceptions.InvalidPermission` for details on
         permission format.
+
+        :param str path: path to get permissions for.
         """
         return self.command(Op.GET_PERMS, path).split("\x00")
 
@@ -167,6 +183,9 @@ class Client(object):
         """Sets a access permissions for a given `path`, see
         :exc:`~pyxs.exceptions.InvalidPermission` for details on
         permission format.
+
+        :param str path: path to set permissions for.
+        :param list perms: a list of permissions to set.
         """
         return self.command(Op.SET_PERMS, path, *perms)
 
@@ -178,19 +197,26 @@ class Client(object):
         contents change or permissions change) this generates an event
         on the changed `path`. Changes made in transactions cause an
         event only if and when committed.
+
+        :param str wpath: path to watch.
+        :param str token: watch token, returned in watch notification.
         """
         return self.command(Op.WATCH, wpath, token)
 
     @spec("<wpath>|", "<token>|")
     def unwatch(self, wpath, token):
-        """Removes a previously added watch."""
+        """Removes a previously added watch.
+
+        :param str wpath: path to unwatch.
+        :param str token: watch token, passed to :meth:`watch`.
+        """
         return self.command(Op.UNWATCH, wpath, token)
 
     def watch_event(self):
         """Waits for any of the watched paths to generate an event,
-        which is a pair, where the first element is event path, i.e.
-        the actual path that was modified and second element is a
-        token, passed to the :meth:`watch` command.
+        which is a ``(path, token)`` pair, where the first element
+        is event path, i.e. the actual path that was modified and
+        second element is a token, passed to the :meth:`watch`.
         """
         return Event(*self.command(Op.WATCH_EVENT).split("\x00"))
 
@@ -199,6 +225,8 @@ class Client(object):
         """Returns the domain's base path, as is used for relative
         transactions: ex: ``"/local/domain/<domid>"``. If a given
         `domid` doesn't exists the answer is undefined.
+
+        :param int domid: domain to get base path for.
         """
         return self.command(Op.GET_DOMAIN_PATH, domid)
 
@@ -208,6 +236,8 @@ class Client(object):
         the domain; that is when `INTRODUCE` for the domain has not
         yet been followed by domain destruction or explicit
         `RELEASE`; and ``False`` otherwise.
+
+        :param int domid: domain to check status for.
         """
         return {
             "T": True,
@@ -229,6 +259,8 @@ class Client(object):
         """Manually requests ``xenstored`` to disconnect from the
         domain.
 
+        :param int domid: domain to disconnect.
+
         .. note:: ``xenstored`` will in any case detect domain
                   destruction and disconnect by itself.
         """
@@ -239,15 +271,20 @@ class Client(object):
         """Tells ``xenstored`` to clear its shutdown flag for a
         domain. This ensures that a subsequent shutdown will fire the
         appropriate watches.
+
+        :param int domid: domain to resume.
         """
         return self.command(Op.RESUME, domid)
 
     @spec("<domid>|", "<tdomid>|")
     def set_target(self, domid, target):
-        """Tells ``xenstored`` that a domain is tartetting another one,
+        """Tells ``xenstored`` that a domain is targetting another one,
         so it should let it tinker with it. This grants domain `domid`
         full access to paths owned by `target`. Domain `domid` also
         inherits all permissions granted to `target` on all other
         paths.
+
+        :param int domid: domain to set target for.
+        :param int target: target domain (yours truly, Captain).
         """
         return self.command(Op.SET_TARGET, domid, target)
