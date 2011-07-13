@@ -10,7 +10,8 @@
 """
 
 __all__ = [
-    "InvalidOperation", "InvalidPayload", "InvalidPath", "InvalidTerm"
+    "InvalidOperation", "InvalidPayload", "InvalidPath", "InvalidTerm",
+    "InvalidPermission", "ConnectionError"
 ]
 
 
