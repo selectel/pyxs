@@ -11,24 +11,29 @@
 
 from __future__ import absolute_import
 
-__all__ = ["Client"]
+__all__ = ["Client", "UnixSocketConnection", "XenBusConnection"]
 
 import errno
 import os
 import platform
-import re
 import socket
 
 from ._internal import Event, Packet, Op
-from .helpers import spec
 from .exceptions import ConnectionError
+from .helpers import spec
 
 
 class UnixSocketConnection(object):
+    """XenStore connection through Unix domain socket.
+
+    :param str path: path to XenStore unix domain socket, if not
+                     provided explicitly is restored from process
+                     environment -- similar to what ``libxs`` does.
+    :param float socket_timeout: see :func:`socket.settimeout` for
+                                 details.
+    """
     def __init__(self, path=None, socket_timeout=None):
         if path is None:
-            # If path is not provided explicitly, fetching it from the
-            # environment, similar to what `libxs` does.
             path = (
                 os.getenv("XENSTORED_PATH") or
                 os.path.join(os.getenv("XENSTORED_RUNDIR",
@@ -90,10 +95,14 @@ class UnixSocketConnection(object):
 
 
 class XenBusConnection(object):
+    """XenStore connection through XenBus.
+
+    :param str path: path to XenBus block device; a predefined
+                     OS-specific constant is used, if a value isn't
+                     provided explicitly.
+    """
     def __init__(self, path=None):
         if path is None:
-            # If path is not provided explicitly, using a predefined
-            # constant for the current OS.
             system = platform.system()
 
             if system == "Linux":
