@@ -141,7 +141,7 @@ class XenBusConnection(object):
             os.write(self.fd, str(packet))
         except OSError as e:
             # .. todo:: convert exception to `pyxs` format.
-            raise ConnectionError("Error {0} while writing to XenBus: {1}"
+            raise ConnectionError("Error while writing to XenBus: {0}"
                                   .format(e.args))
 
     def recv(self):
@@ -149,7 +149,7 @@ class XenBusConnection(object):
             return Packet.from_file(os.fdopen(self.fd))
         except OSError as e:
             # .. todo:: convert exception to `pyxs` format.
-            raise ConnectionError("Error {0} while reading from XenBus: {1}"
+            raise ConnectionError("Error while reading from XenBus: {0}"
                                   .format(e.args))
 
 
