@@ -38,3 +38,7 @@ with Client("/var/run/xenstored/socket") as c:
     # e) directory listing and permissions.
     print(c.directory(b"/local/domain/0"))
     print(c.get_perms(b"/local/domain/0"))
+
+    # f) let's watch some paths!
+    print(c.watch(b"/local/domain/0", "foo"))
+    print(c.unwatch(b"/local/domain/0", "foo"))

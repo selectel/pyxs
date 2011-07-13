@@ -146,6 +146,20 @@ def validate_path(path):
         raise InvalidPath(path)
 
 
+def validate_wpath(wpath):
+    """Checks if a given watch path is valid -- it should either be a
+    valid path or a special, starting with ``@`` character.
+
+    :param bytes wpath: watch path to check.
+    :raises pyxs.exceptions.InvalidPath: when path fails to validate.
+    """
+    if (wpath.startswith("@") and not
+        re.match("^@(?:introduceDomain|releaseDomain)\x00$", wpath)):
+        raise InvalidPath(wpath)
+    else:
+        validate_path(wpath)
+
+
 def validate_perms(perms):
     """Checks if a given list of permision follows the format described
     in :meth:`~pyxs.client.Client.get_perms`.
@@ -162,6 +176,7 @@ def validate_perms(perms):
 #: A dictionary of extra validators for some variable names.
 extra_validators = {
     "path": validate_path,
+    "wpath": validate_wpath,
     "perms": validate_perms
 }
 

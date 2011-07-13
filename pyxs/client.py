@@ -169,3 +169,19 @@ class Client(object):
         permission format.
         """
         return self.command(Op.SET_PERMS, path, *perms)
+
+    @spec("<wpath>|", "<token>|")
+    def watch(self, wpath, token):
+        """Adds a watch.
+
+        When a `path` is modified (including path creation, removal,
+        contents change or permissions change) this generates an event
+        on the changed `path`. Changes made in transactions cause an
+        event only if and when committed.
+        """
+        return self.command(Op.WATCH, wpath, token)
+
+    @spec("<wpath>|", "<token>|")
+    def unwatch(self, wpath, token):
+        """Removes a previously added watch."""
+        return self.command(Op.UNWATCH, wpath, token)
