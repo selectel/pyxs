@@ -44,3 +44,7 @@ with Client("/var/run/xenstored/socket") as c:
     print(c.watch(b"/foo/bar", "baz"))
     print(c.watch_event())  # No do `$ xenstore-write /foo/bar <anything>`.
     print(c.unwatch(b"/foo/bar", "baz"))
+
+    # g) domain managment commands.
+    print(c.get_domain_path(0))
+    print(c.is_domain_introduced(0))

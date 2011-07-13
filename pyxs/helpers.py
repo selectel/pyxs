@@ -100,7 +100,7 @@ def spec(*terms):
 
         @wraps(func)
         def inner(self, *args):
-            args = list(args)
+            args = [force_bytes(a) for a in args]
 
             for idx, (v, arg) in enumerate(zip(func.__spec__, args)):
                 # .. note:: some string arguments are required to
@@ -235,3 +235,22 @@ def append_null(value):
         return list(map(append_null, value))
     else:
         return value
+
+
+def force_bytes(value):
+    """Coerces a given value to :func:`bytes`.
+
+    >>> force_bytes(u"foo")
+    b"foo"
+    >>> force_bytes([u"foo", 1, None])
+    [b'foo', b'1', b'None']
+    """
+    if isinstance(value, bytes):
+        return value
+
+    if isinstance(value, unicode):
+        return value.encode("utf-8")
+    elif hasattr(value, "__iter__"):
+        return list(map(force_bytes, value))
+    else:
+        return bytes(value)

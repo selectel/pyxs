@@ -193,3 +193,23 @@ class Client(object):
         token, passed to the :meth:`watch` command.
         """
         return Event(*self.command(Op.WATCH_EVENT).split("\x00"))
+
+    @spec("<domid>|")
+    def get_domain_path(self, domid):
+        """Returns the domain's base path, as is used for relative
+        transactions: ex: ``"/local/domain/<domid>"``. If a given
+        `domid` doesn't exists the answer is undefined.
+        """
+        return self.command(Op.GET_DOMAIN_PATH, domid)
+
+    @spec("<domid>|")
+    def is_domain_introduced(self, domid):
+        """Returns ``True` if ``xenstored` is in communication with
+        the domain; that is when `INTRODUCE` for the domain has not
+        yet been followed by domain destruction or explicit
+        `RELEASE`; and ``False`` otherwise.
+        """
+        return {
+            "T": True,
+            "F": False
+        }.get(self.command(Op.IS_DOMAIN_INTRODUCED, domid))
