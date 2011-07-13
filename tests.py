@@ -36,8 +36,7 @@ def test_packet_from_string():
 
 def test_compile():
     # a) <foo> -- non-empty string with no NULL bytes.
-    name, v = compile("<foo>")
-    assert name == "foo"
+    v = compile("<foo>")
     assert v("foo")
     assert not v("foo\x07")
     assert not v("foo\x00")
@@ -45,8 +44,7 @@ def test_compile():
     assert not v("")
 
     # b) <foo|> -- non-empty string with zero or more NULL bytes.
-    name, v = compile("<foo|>")
-    assert name == "foo"
+    v = compile("<foo|>")
     assert v("foo")
     assert v("foo\x00")
     assert v("f\x00\x00oo")
@@ -55,8 +53,7 @@ def test_compile():
 
     # c) <foo>| -- non-empty string with no NULL bytes, followed by a
     #    trailing NULL.
-    name, v = compile("<foo>|")
-    assert name == "foo"
+    v = compile("<foo>|")
     assert v("foo\x00")
     assert not v("\x00")
     assert not v("f\x00oo\x00")
@@ -64,8 +61,7 @@ def test_compile():
 
     # d) <foo>|* -- zero or more non-empty strings with no NULL bytes,
     #    followed by a trailing NULL.
-    name, v = compile("<foo>|*")
-    assert name == "foo"
+    v = compile("<foo>|*")
     assert v([])
     assert v(["foo\x00"])
     assert v(["foo\x00", "bar\x00"])
@@ -74,8 +70,7 @@ def test_compile():
 
     # e) <foo>|+ -- one or more non-empty strings with no NULL bytes,
     #    followed by a trailing NULL.
-    name, v = compile("<foo>|+")
-    assert name == "foo"
+    v = compile("<foo>|+")
     assert v(["foo\x00"])
     assert v(["foo\x00", "bar\x00"])
     assert not v(["foo\x00", "bar\x00", "\x00"])
@@ -103,9 +98,6 @@ def test_validate_path():
 
         with pytest.raises(InvalidPath):
             validate_path("/foo" + char)
-
-    with pytest.raises(InvalidPath):
-        validate_path("/foo\x00")
 
     # c) no trailing / -- except for root path.
     with pytest.raises(InvalidPath):
