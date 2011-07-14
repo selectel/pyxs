@@ -33,7 +33,13 @@ _codeerror = dict((message, code)
 
 
 class FileDescriptorConnection(object):
-    fd = None
+    """Abstract XenStore connection, using fd socket for I/O operations.
+
+    Subclasses are expected to define :meth:`connect()` and set
+    :attr:`fd` and :attr:`path` attributes, where `path` is a human
+    readable path to the object, `fd` points to.
+    """
+    fd = path = None
 
     def __init__(self):
         raise NotImplemented("__init__() should be overriden by subclasses.")
@@ -76,7 +82,6 @@ class FileDescriptorConnection(object):
             return Packet(op, os.read(self.fd, size), rq_id, tx_id)
 
 
-
 class UnixSocketConnection(FileDescriptorConnection):
     """XenStore connection through Unix domain socket.
 
@@ -107,14 +112,23 @@ class UnixSocketConnection(FileDescriptorConnection):
             return
 
         try:
-            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sock.settimeout(self.socket_timeout)
-            sock.connect(self.path)
+            # XXX Generally speaking, this `socket` instance is redundant,
+            # but we still need to reference it, to keep it away from
+            # the GC, because `socket.__del__()` closes the
+            # corresponding fd.
+            self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.socket.settimeout(self.socket_timeout)
+            self.socket.connect(self.path)
         except socket.error as e:
             raise ConnectionError("Error connecting to {0!r}: {1}"
                                   .format(self.path, e.args))
         else:
-            self.fd = sock.fileno()
+            self.fd = self.socket.fileno()
+
+    def disconnect(self):
+        super(UnixSocketConnection, self).disconnect()
+
+        self.socket = None
 
 
 class XenBusConnection(FileDescriptorConnection):

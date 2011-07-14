@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import string
-from cStringIO import StringIO
 
 import pytest
 
@@ -20,34 +19,6 @@ def test_packet():
     # b) invalid payload -- maximum size exceeded.
     with pytest.raises(InvalidPayload):
         Packet(Op.DEBUG, "hello" * 4096, 0)
-
-
-def test_packet_from_string():
-    d = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00OK\x00"
-    p = Packet.from_string(d)
-
-    assert p.op == Op.DEBUG
-    assert p.rq_id == 0
-    assert p.tx_id == 0
-    assert p.size == 3
-    assert p.payload == b"OK\x00"
-    assert len(p.payload) == p.size
-    assert str(p) == d
-
-
-def test_packet_from_file():
-    d = StringIO(b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03"
-                 b"\x00\x00\x00OK\x00")
-    p = Packet.from_file(d)
-    d.seek(0)
-
-    assert p.op == Op.DEBUG
-    assert p.rq_id == 0
-    assert p.tx_id == 0
-    assert p.size == 3
-    assert p.payload == b"OK\x00"
-    assert len(p.payload) == p.size
-    assert str(p) == d.read()
 
 
 # Helpers.
