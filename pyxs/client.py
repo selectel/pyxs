@@ -17,9 +17,7 @@ from __future__ import absolute_import
 __all__ = ["Client", "UnixSocketConnection", "XenBusConnection"]
 
 import errno
-import mmap
 import os
-import resource
 import socket
 from collections import deque
 
@@ -28,9 +26,9 @@ from .exceptions import ConnectionError, UnexpectedPacket, PyXSError
 from .helpers import spec
 
 
-#: A reverse mapping for :data:`errno.errorcodes`.
-_errorcodes = dict((message, code)
-                   for code, message in errno.errorcodes.iteritems())
+#: A reverse mapping for :data:`errno.errorcode`.
+_codeerror = dict((message, code)
+                  for code, message in errno.errorcode.iteritems())
 
 
 class UnixSocketConnection(object):
@@ -53,6 +51,11 @@ class UnixSocketConnection(object):
         self.path = path
         self.socket = None
         self.socket_timeout = None
+
+    @property
+    def args(self):
+        return {"unix_socket_path": self.path,
+                "socket_timeout": self.socket_timeout}
 
     def connect(self):
         if self.socket:
@@ -119,6 +122,10 @@ class XenBusConnection(object):
 
         raise NotImplemented("... some day maybe <_<")
 
+    @property
+    def args(self):
+        return {"xen_bus_path": self.path}
+
 
 class Client(object):
     """XenStore client -- <useful comment>.
@@ -133,6 +140,9 @@ class Client(object):
                                  used as a backend.
     :param float socket_timeout: see :func:`socket.settimeout` for
                                  details.
+    :param bool transaction: if ``True`` :meth:`transaction_start` will
+                             be issued right after connection is
+                             established.
 
     .. note:: :class:`UnixSocketConnection` is used as a fallback value,
               if backend cannot be determined from arguments given.
@@ -145,53 +155,63 @@ class Client(object):
     'OK'
     'baz'
     """
-    def __init__(self, xen_bus_path=None, unix_socket_path=None,
-                 socket_timeout=None):
+    def __init__(self, unix_socket_path=None, socket_timeout=None,
+                 xen_bus_path=None, transaction=None):
         if unix_socket_path or not xen_bus_path:
             self.connection = UnixSocketConnection(
                 unix_socket_path, socket_timeout=socket_timeout)
         else:
             self.connection = XenBusConnection(xen_bus_path)
 
+        self.tx_id = 0
         self.events = deque()
+
+        if transaction:  # Requesting a new transaction id.
+            self.tx_id = self.transaction_start()
 
     def __enter__(self):
         self.connection.connect()
         return self
 
     def __exit__(self, *exc_info):
+        if not any(exc_info) and self.tx_id:
+            self.transaction_end(commit=True)
+
         self.connection.disconnect()
 
     # Private API.
     # ............
 
-    def send(self, type, payload):
-        out_packet = Packet(type, payload)
-        self.connection.send(out_packet)
+    def communicate(self, op, *args):
+        self.connection.send(Packet(op, "".join(args), tx_id=self.tx_id))
 
-        in_packet = self.connection.recv()
-        if not (in_packet.rq_id is out_packet.rq_id and
-                in_packet.tx_id is out_packet.tx_id):
-            raise UnexpectedPacket(in_packet)
-
-        # Incoming packet should either be a watch event or have the
-        # same operation type as the packet sent.
-        if (in_packet.op is not out_packet.op and
-            in_packet.op is Op.WATCH_EVENT):
-            self.events.append(in_packet)
-
-        return in_packet
-
-    def command(self, type, *args):
-        packet = self.send(type, "".join(args))
+        packet = self.connection.recv()
 
         # According to ``xenstore.txt`` erroneous responses start with
         # a capital E and end with ``NULL``-byte.
         if not packet:
-            error = _errorcodes.get(packet.payload[:-1], 0)
+            error = _codeerror.get(packet.payload[:-1], 0)
             raise PyXSError(error, os.strerror(error))
-        else:
-            return packet.payload
+
+        if packet.tx_id is not self.tx_id:
+            raise UnexpectedPacket(packet)
+
+        # Incoming packet should either be a watch event or have the
+        # same operation type as the packet sent.
+        if packet.op is not op:
+            if packet.op is Op.WATCH_EVENT:
+                self.events.append(packet)
+            else:
+                raise UnexpectedPacket(packet)
+
+        return packet
+
+    def command(self, *args):
+        return self.communicate(*args).payload
+
+    def ack(self, *args):
+        if self.command(*args) != "OK\x00":
+            raise PyXSError("Ooops ...")
 
     # Public API.
     # ...........
@@ -212,7 +232,7 @@ class Client(object):
                       coerced to :func:`bytes` eventually).
         :param str path: a path to write to.
         """
-        return self.command(Op.WRITE, path, value)
+        self.ack(Op.WRITE, path, value)
 
     @spec("<path>|")
     def mkdir(self, path):
@@ -222,7 +242,7 @@ class Client(object):
 
         :param str path: path to directory to create.
         """
-        return self.command(Op.MKDIR, path)
+        self.ack(Op.MKDIR, path)
 
     @spec("<path>|")
     def rm(self, path):
@@ -233,7 +253,7 @@ class Client(object):
 
         :param str path: path to directory to remove.
         """
-        return self.command(Op.RM, path)
+        self.ack(Op.RM, path)
 
     @spec("<path>|")
     def directory(self, path):
@@ -264,7 +284,7 @@ class Client(object):
         :param str path: path to set permissions for.
         :param list perms: a list of permissions to set.
         """
-        return self.command(Op.SET_PERMS, path, *perms)
+        self.ack(Op.SET_PERMS, path, *perms)
 
     @spec("<wpath>|", "<token>|")
     def watch(self, wpath, token):
@@ -278,7 +298,7 @@ class Client(object):
         :param str wpath: path to watch.
         :param str token: watch token, returned in watch notification.
         """
-        return self.command(Op.WATCH, wpath, token)
+        self.ack(Op.WATCH, wpath, token)
 
     @spec("<wpath>|", "<token>|")
     def unwatch(self, wpath, token):
@@ -287,7 +307,7 @@ class Client(object):
         :param str wpath: path to unwatch.
         :param str token: watch token, passed to :meth:`watch`.
         """
-        return self.command(Op.UNWATCH, wpath, token)
+        self.ack(Op.UNWATCH, wpath, token)
 
     def wait(self):
         """Waits for any of the watched paths to generate an event,
@@ -336,7 +356,7 @@ class Client(object):
         :param long mfn: address of xenstore page in `domid`.
         :param int eventch: an unbound event chanel in `domid`.
         """
-        return self.command(Op.INTRODUCE, domid, mfn, eventchn)
+        self.ack(Op.INTRODUCE, domid, mfn, eventchn)
 
     @spec("<domid>|")
     def release(self, domid):
@@ -350,7 +370,7 @@ class Client(object):
 
         .. todo:: make sure it's only executed from Dom0.
         """
-        return self.command(Op.RELEASE, domid)
+        self.ack(Op.RELEASE, domid)
 
     @spec("<domid>|")
     def resume(self, domid):
@@ -362,7 +382,7 @@ class Client(object):
 
         .. todo:: make sure it's only executed from Dom0.
         """
-        return self.command(Op.RESUME, domid)
+        self.ack(Op.RESUME, domid)
 
     @spec("<domid>|", "<tdomid>|")
     def set_target(self, domid, target):
@@ -377,4 +397,30 @@ class Client(object):
 
         .. todo:: make sure it's only executed from Dom0.
         """
-        return self.command(Op.SET_TARGET, domid, target)
+        self.ack(Op.SET_TARGET, domid, target)
+
+    def transaction_start(self):
+        """Starts a new transaction and returns transaction handle, which
+        is simply an int.
+
+        .. warning::
+
+           Currently ``xenstored`` has a bug that after 2^32 transactions
+           it will allocate id 0 for an actual transaction.
+        """
+        return int(self.command(Op.TRANSACTION_START, "\x00") .rstrip("\x00"))
+
+
+    def transaction_end(self, commit=True):
+        """End a transaction currently in progress; if no transaction is
+        running no command is sent to XenStore.
+        """
+        if self.tx_id:
+            self.ack(Op.TRANSACTION_END, ["F", "T"][commit] + "\x00")
+            self.tx_id = 0
+
+    def transaction(self):
+        if self.tx_id:
+            raise PyXSError(errno.EALREADY, os.strerror(errno.EALREADY))
+
+        return Client(transaction=True, **self.connection.args)

@@ -65,7 +65,7 @@ class Packet(namedtuple("_Packet", "op rq_id tx_id size payload")):
     #: for details.
     _struct = struct.Struct(b"IIII")
 
-    def __new__(cls, op, payload, rq_id=0, tx_id=0):
+    def __new__(cls, op, payload, rq_id=None, tx_id=None):
         if isinstance(payload, unicode):
             payload = payload.encode("utf-8")
 
@@ -78,7 +78,7 @@ class Packet(namedtuple("_Packet", "op rq_id tx_id size payload")):
             raise InvalidOperation(op)
 
         return super(Packet, cls).__new__(cls,
-            op, rq_id, tx_id , len(payload), payload)
+            op, rq_id or 0, tx_id or 0 , len(payload), payload)
 
     def __str__(self):
         # Note the ``[:-1]`` slice -- the actual payload is excluded.

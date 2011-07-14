@@ -9,7 +9,7 @@
     * over a Unix socket with :class:`~pyxs.client.UnixSocketConnection`;
     * over XenBus_ with :class:`~pyxs.client.XenBusConnection`.
 
-    The latter one is the only one fully functional, to the moment.
+    **The latter one is the only one fully functional, at the moment.**
     Which backend is used is determined by the arguments used for
     :class:`~pyxs.client.Client` initialization, for example the
     following code creates a :class:`~pyxs.client.Client` instance,
@@ -32,6 +32,6 @@
 """
 
 from .client import Client
-from .exceptions import ConnectionError, InvalidOperation, InvalidPath, \
-    InvalidPayload, InvalidTerm
+from .exceptions import PyXSError, ConnectionError, UnexpectedPacket, \
+    InvalidOperation, InvalidPath, InvalidPayload, InvalidTerm
 
