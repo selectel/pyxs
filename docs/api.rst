@@ -12,3 +12,7 @@ API reference
 
 .. automodule:: pyxs.exceptions
     :members:
+
+.. automodule:: pyxs._internal
+    :members:
+    :exclude-members: Event

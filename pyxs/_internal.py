@@ -51,7 +51,7 @@ Event = namedtuple("Event", "path token")
 class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
     """A single message to or from XenStore.
 
-    :param int op: an item from :data:`~pyxs.Op`, representing
+    :param int op: an item from :data:`Op`, representing
                    operation, performed by this packet.
     :param bytes payload: packet payload, should be a valid ASCII-string
                           with characters between ``[0x20;0x7f]``.
@@ -65,7 +65,7 @@ class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
     #: for details.
     _fmt = b"IIII"
 
-    def __new__(cls, op, payload, req_id, tx_id=None):
+    def __new__(cls, op, payload, req_id=0, tx_id=0):
         if isinstance(payload, unicode):
             payload = payload.encode("utf-8")
 
@@ -77,16 +77,23 @@ class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
         if op not in Op:
             raise InvalidOperation(op)
 
-        if tx_id is None: tx_id = 0
-
         return super(Packet, cls).__new__(cls,
-            op, req_id or 0, tx_id, len(payload), payload)
+            op, req_id, tx_id , len(payload), payload)
+
+    def __str__(self):
+        # Note the ``[:-1]`` slice -- the actual payload is excluded.
+        return struct.pack(self._fmt, *self[:-1]) + self.payload
 
     def __nonzero__(self):
         return not re.match(r"^E[A-Z]+\x00$", self.payload)
 
     @classmethod
     def from_string(cls, s):
+        """Creates a :class:`Packet` from a given string.
+
+        .. note:: The caller is responsible for handling any possible
+                  exceptions.
+        """
         if isinstance(s, unicode):
             s = s.encode("utf-8")
 
@@ -96,9 +103,11 @@ class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
 
     @classmethod
     def from_file(cls, f):
-        op, req_id, tx_id, l = map(int, struct.unpack(cls._fmt, f.read(16)))
-        return cls(op, f.read(l), req_id, tx_id)
+        """Creates a :class:`Packet` from a give file-like object.
 
-    def __str__(self):
-        # Note the ``[:-1]`` slice -- the actual payload is excluded.
-        return struct.pack(self._fmt, *self[:-1]) + self.payload
+        .. note:: The caller is responsible for handling any possible
+                  exceptions.
+        """
+        op, req_id, tx_id, l = map(int,
+            struct.unpack(cls._fmt, f.read(struct.calcsize(cls._fmt))))
+        return cls(op, f.read(l), req_id, tx_id)
