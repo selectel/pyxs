@@ -12,7 +12,6 @@ from __future__ import unicode_literals
 
 __all__ = ["Event", "Op", "Packet"]
 
-import re
 import struct
 from collections import namedtuple
 
@@ -83,9 +82,6 @@ class Packet(namedtuple("_Packet", "op rq_id tx_id size payload")):
     def __str__(self):
         # Note the ``[:-1]`` slice -- the actual payload is excluded.
         return self._struct.pack(*self[:-1]) + self.payload
-
-    def __nonzero__(self):
-        return not re.match(r"^E[A-Z]+\x00$", self.payload)
 
     @classmethod
     def from_string(cls, s):

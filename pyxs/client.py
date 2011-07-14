@@ -189,20 +189,19 @@ class Client(object):
 
         # According to ``xenstore.txt`` erroneous responses start with
         # a capital E and end with ``NULL``-byte.
-        if not packet:
+        if packet.op is Op.ERROR:
             error = _codeerror.get(packet.payload[:-1], 0)
             raise PyXSError(error, os.strerror(error))
-
-        if packet.tx_id is not self.tx_id:
-            raise UnexpectedPacket(packet)
-
         # Incoming packet should either be a watch event or have the
         # same operation type as the packet sent.
-        if packet.op is not op:
-            if packet.op is Op.WATCH_EVENT:
-                self.events.append(packet)
-            else:
-                raise UnexpectedPacket(packet)
+        elif packet.op is Op.WATCH_EVENT:
+            self.events.append(packet)
+        elif packet.op is not op:
+            raise UnexpectedPacket(packet)
+        # Making sure sent and recieved packets are within the same
+        # transaction.
+        elif packet.tx_id is not self.tx_id:
+            raise UnexpectedPacket(packet)
 
         return packet
 
