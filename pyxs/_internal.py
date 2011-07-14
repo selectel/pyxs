@@ -48,7 +48,7 @@ Operations = Op = namedtuple("Operations", [
 Event = namedtuple("Event", "path token")
 
 
-class Packet(namedtuple("_Packet", "op rq_id tx_id len payload")):
+class Packet(namedtuple("_Packet", "op rq_id tx_id size payload")):
     """A single message to or from XenStore.
 
     :param int op: an item from :data:`Op`, representing
@@ -61,9 +61,9 @@ class Packet(namedtuple("_Packet", "op rq_id tx_id len payload")):
     :param int tx_id: transaction id, defaults to ``0`` -- which means
                       no transaction is running.
     """
-    #: ``xsd_sockmsg`` struct format see ``xen/include/public/io/xs_wire.h``
+    #: ``xsd_sockmsg`` struct see ``xen/include/public/io/xs_wire.h``
     #: for details.
-    _fmt = b"IIII"
+    _struct = struct.Struct(b"IIII")
 
     def __new__(cls, op, payload, rq_id=0, tx_id=0):
         if isinstance(payload, unicode):
@@ -82,7 +82,7 @@ class Packet(namedtuple("_Packet", "op rq_id tx_id len payload")):
 
     def __str__(self):
         # Note the ``[:-1]`` slice -- the actual payload is excluded.
-        return struct.pack(self._fmt, *self[:-1]) + self.payload
+        return self._struct.pack(*self[:-1]) + self.payload
 
     def __nonzero__(self):
         return not re.match(r"^E[A-Z]+\x00$", self.payload)
@@ -97,9 +97,10 @@ class Packet(namedtuple("_Packet", "op rq_id tx_id len payload")):
         if isinstance(s, unicode):
             s = s.encode("utf-8")
 
-        op, rq_id, tx_id, l = map(int,
-            struct.unpack(cls._fmt, s[:struct.calcsize(cls._fmt)]))
-        return cls(op, s[-l:], rq_id, tx_id)
+        (op,
+         rq_id, tx_id,
+         size) = map(int, cls._struct.unpack(s[:cls._struct.size]))
+        return cls(op, s[-size:], rq_id, tx_id)
 
     @classmethod
     def from_file(cls, f):
@@ -108,6 +109,7 @@ class Packet(namedtuple("_Packet", "op rq_id tx_id len payload")):
         .. note:: The caller is responsible for handling any possible
                   exceptions.
         """
-        op, rq_id, tx_id, l = map(int,
-            struct.unpack(cls._fmt, f.read(struct.calcsize(cls._fmt))))
-        return cls(op, f.read(l), rq_id, tx_id)
+        (op,
+         rq_id, tx_id,
+         size) = map(int, cls._struct.unpack(f.read(cls._struct.size)))
+        return cls(op, f.read(size), rq_id, tx_id)

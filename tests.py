@@ -29,9 +29,9 @@ def test_packet_from_string():
     assert p.op == Op.DEBUG
     assert p.rq_id == 0
     assert p.tx_id == 0
-    assert p.len == 3
+    assert p.size == 3
     assert p.payload == b"OK\x00"
-    assert len(p.payload) == p.len
+    assert len(p.payload) == p.size
     assert str(p) == d
 
 
@@ -44,9 +44,9 @@ def test_packet_from_file():
     assert p.op == Op.DEBUG
     assert p.rq_id == 0
     assert p.tx_id == 0
-    assert p.len == 3
+    assert p.size == 3
     assert p.payload == b"OK\x00"
-    assert len(p.payload) == p.len
+    assert len(p.payload) == p.size
     assert str(p) == d.read()
 
 

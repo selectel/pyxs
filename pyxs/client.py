@@ -3,8 +3,11 @@
     pyxs.client
     ~~~~~~~~~~~
 
-    This module implements XenStore client, which uses Unix socket for
-    communication.
+    This module implements XenStore client, which uses multiple connection
+    options for communication: :class:`UnixSocketConnection` and
+    :class:`XenBusConnection`. Note however, that the latter one is
+    not yet complete and should not be used, unless you know what
+    you're doing.
 
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
 """
@@ -14,14 +17,20 @@ from __future__ import absolute_import
 __all__ = ["Client", "UnixSocketConnection", "XenBusConnection"]
 
 import errno
+import mmap
 import os
-import platform
+import resource
 import socket
 from collections import deque
 
 from ._internal import Event, Packet, Op
-from .exceptions import ConnectionError, UnexpectedPacket
+from .exceptions import ConnectionError, UnexpectedPacket, PyXSError
 from .helpers import spec
+
+
+#: A reverse mapping for :data:`errno.errorcodes`.
+_errorcodes = dict((message, code)
+                   for code, message in errno.errorcodes.iteritems())
 
 
 class UnixSocketConnection(object):
@@ -98,60 +107,61 @@ class XenBusConnection(object):
     :param str path: path to XenBus block device; a predefined
                      OS-specific constant is used, if a value isn't
                      provided explicitly.
+
+    .. warning:: This backend is experimental currently incomplete,
+                 use it at your own risk! you have been warned!
     """
     def __init__(self, path=None):
         if path is None:
-            system = platform.system()
-
-            if system == "Linux":
-                path = "/proc/xen/xenbus"
-            elif system == "NetBSD":
-                path = "/kern/xen/xenbus"
-            else:
-                path = "/dev/xen/xenbus"
+            # .. todo:: Check if NetBSD port has a different location
+            #           of XenBus interface -- ``/kern/xen/...`.
+            path = "/proc/xen/xsd_kva"
 
         self.path = path
-        self.fd = None
+        self.mmap = None
 
     def connect(self):
-        if self.fd:
+        if self.mmap:
             return
 
         try:
-            self.fd = os.open(self.path, os.O_RDWR)
+            # .. note:: The following will only work with a `patched`
+            #           version of `mmap` module, which allows working
+            #           with zero-sized files.
+            self.mmap = mmap.mmap(os.open(self.path, os.O_RDWR),
+                                  resource.getpagesize())
         except (IOError, OSError) as e:
             raise ConnectionError("Error while opening {0}: {1}"
                                   .format(self.path, e))
 
     def disconnect(self):
-        if self.fd is None:
+        if self.mmap is None:
             return
 
         try:
-            os.close(self.fd)
-        except OSError:
-            pass
+            self.mmap.close()
+        except OSError: pass
 
-        self.fd = None
+        self.mmap = None
 
     def send(self, packet):
-        if not self.fd:
+        if not self.mmap:
             self.connect()
 
         try:
-            os.write(self.fd, str(packet))
-        except OSError as e:
+            self.mmap.write(str(packet))
+        except IOError as e:
             # .. todo:: convert exception to `pyxs` format.
             raise ConnectionError("Error while writing to XenBus: {0}"
-                                  .format(e.args))
+                                  .format(*e.args))
 
     def recv(self):
         try:
-            return Packet.from_file(os.fdopen(self.fd))
-        except OSError as e:
+            return Packet.from_file(self.mmap)
+        except IOError as e:
             # .. todo:: convert exception to `pyxs` format.
             raise ConnectionError("Error while reading from XenBus: {0}"
-                                  .format(e.args))
+                                  .format(*e.args))
 
 
 class Client(object):
@@ -222,7 +232,8 @@ class Client(object):
         # According to ``xenstore.txt`` erroneous responses start with
         # a capital E and end with ``NULL``-byte.
         if not packet:
-            raise RuntimeError(packet.payload[:-1])
+            error = _errorcodes.get(packet.payload[:-1], 0)
+            raise PyXSError(error, os.strerror(error))
         else:
             return packet.payload
 
