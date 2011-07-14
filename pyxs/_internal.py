@@ -82,30 +82,3 @@ class Packet(namedtuple("_Packet", "op rq_id tx_id size payload")):
     def __str__(self):
         # Note the ``[:-1]`` slice -- the actual payload is excluded.
         return self._struct.pack(*self[:-1]) + self.payload
-
-    @classmethod
-    def from_string(cls, s):
-        """Creates a :class:`Packet` from a given string.
-
-        .. note:: The caller is responsible for handling any possible
-                  exceptions.
-        """
-        if isinstance(s, unicode):
-            s = s.encode("utf-8")
-
-        (op,
-         rq_id, tx_id,
-         size) = map(int, cls._struct.unpack(s[:cls._struct.size]))
-        return cls(op, s[-size:], rq_id, tx_id)
-
-    @classmethod
-    def from_file(cls, f):
-        """Creates a :class:`Packet` from a give file-like object.
-
-        .. note:: The caller is responsible for handling any possible
-                  exceptions.
-        """
-        (op,
-         rq_id, tx_id,
-         size) = map(int, cls._struct.unpack(f.read(cls._struct.size)))
-        return cls(op, f.read(size), rq_id, tx_id)

@@ -18,6 +18,7 @@ __all__ = ["Client", "UnixSocketConnection", "XenBusConnection"]
 
 import errno
 import os
+import platform
 import socket
 from collections import deque
 
@@ -31,7 +32,52 @@ _codeerror = dict((message, code)
                   for code, message in errno.errorcode.iteritems())
 
 
-class UnixSocketConnection(object):
+class FileDescriptorConnection(object):
+    fd = None
+
+    def __init__(self):
+        raise NotImplemented("__init__() should be overriden by subclasses.")
+
+    def disconnect(self):
+        if self.fd is None:
+            return
+
+        try:
+            os.close(self.fd)
+        except OSError:
+            pass
+        finally:
+            self.fd = None
+
+    def send(self, packet):
+        if not self.fd:
+            self.connect()
+
+        try:
+            return os.write(self.fd, str(packet))
+        except OSError as e:
+            if e.args[0] is errno.EPIPE:
+                self.disconnect()
+
+            raise ConnectionError("Error while writing to {0!r}: {1}"
+                                  .format(self.path, e.args))
+
+    def recv(self):
+        try:
+            data = os.read(self.fd, Packet._struct.size)
+        except OSError as e:
+            if e.args[0] is errno.EPIPE:
+                self.disconnect()
+
+            raise ConnectionError("Error while reading from {0!r}: {1}"
+                                  .format(self.path, e.args))
+        else:
+            op, rq_id, tx_id, size = Packet._struct.unpack(data)
+            return Packet(op, os.read(self.fd, size), rq_id, tx_id)
+
+
+
+class UnixSocketConnection(FileDescriptorConnection):
     """XenStore connection through Unix domain socket.
 
     :param str path: path to XenStore unix domain socket, if not
@@ -49,7 +95,6 @@ class UnixSocketConnection(object):
             )
 
         self.path = path
-        self.socket = None
         self.socket_timeout = None
 
     @property
@@ -58,73 +103,57 @@ class UnixSocketConnection(object):
                 "socket_timeout": self.socket_timeout}
 
     def connect(self):
-        if self.socket:
+        if self.fd:
             return
 
         try:
-            self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            self.socket.settimeout(self.socket_timeout)
-            self.socket.connect(self.path)
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.settimeout(self.socket_timeout)
+            sock.connect(self.path)
         except socket.error as e:
-            raise ConnectionError("Error connecting to {0}: {1}"
-                                  .format(self.path, e))
-
-    def disconnect(self):
-        if self.socket is None:
-            return
-
-        try:
-            self.socket.close()
-        except socket.error:
-            pass
-
-        self.socket = None
-
-    def send(self, packet):
-        if not self.socket:
-            self.connect()
-
-        try:
-            return self.socket.sendall(str(packet))
-        except socket.error as e:
-            if e.args[0] is errno.EPIPE:
-                self.disconnect()
-
-            raise ConnectionError("Error {0} while writing to socket: {1}"
-                                  .format(*e.args))
-
-    def recv(self):
-        try:
-            return Packet.from_file(self.socket.makefile())
-        except socket.error as e:
-            if e.args[0] is errno.EPIPE:
-                self.disconnect()
-
-            raise ConnectionError("Error {0} while reading from socket: {1}"
-                                  .format(*e.args))
+            raise ConnectionError("Error connecting to {0!r}: {1}"
+                                  .format(self.path, e.args))
+        else:
+            self.fd = sock.fileno()
 
 
-class XenBusConnection(object):
+class XenBusConnection(FileDescriptorConnection):
     """XenStore connection through XenBus.
 
     :param str path: path to XenBus block device; a predefined
                      OS-specific constant is used, if a value isn't
                      provided explicitly.
-
-    .. warning:: This backend is experimental currently incomplete,
-                 use it at your own risk! you have been warned!
     """
     def __init__(self, path=None):
         if path is None:
-            # .. todo:: Check if NetBSD port has a different location
-            #           of XenBus interface -- ``/kern/xen/...`.
-            path = "/proc/xen/xsd_kva"
+            # .. note:: it looks like OCaml-powered ``xenstored``
+            # simply ignores the posibility of being launched on a
+            # platform, different from Linux, but ``libxs``  has those
+            # constants in-place.
+            system = platform.system()
 
-        raise NotImplemented("... some day maybe <_<")
+            if system == "Linux":
+                path = "/proc/xen/xenbus"
+            elif system == "NetBSD":
+                path = "/kern/xen/xenbus"
+            else:
+                path = "/dev/xen/xenbus"
+
+        self.path = path
 
     @property
     def args(self):
         return {"xen_bus_path": self.path}
+
+    def connect(self):
+        if self.fd:
+            return
+
+        try:
+            self.fd = os.open(self.path, os.O_RDWR)
+        except OSError as e:
+            raise ConnectionError("Error while opening {0!r}: {1}"
+                                  .format(self.path, e.args))
 
 
 class Client(object):
@@ -200,7 +229,7 @@ class Client(object):
             raise UnexpectedPacket(packet)
         # Making sure sent and recieved packets are within the same
         # transaction.
-        elif packet.tx_id is not self.tx_id:
+        elif self.tx_id and packet.tx_id is not self.tx_id:
             raise UnexpectedPacket(packet)
 
         return packet

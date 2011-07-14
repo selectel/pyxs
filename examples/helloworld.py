@@ -31,6 +31,9 @@ with Client() as c:
         print("`/foo/bar` is no moar!")
 
     # d) directory listing and permissions.
+    c.mkdir(b"/foo/bar")
+    c.mkdir(b"/foo/baz")
+    c.mkdir(b"/foo/boo")
     print(c.directory(b"/foo"))
     print(c.get_perms(b"/foo"))
 
