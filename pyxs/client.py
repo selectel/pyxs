@@ -17,9 +17,10 @@ import errno
 import os
 import platform
 import socket
+from collections import deque
 
 from ._internal import Event, Packet, Op
-from .exceptions import ConnectionError
+from .exceptions import ConnectionError, UnexpectedPacket
 from .helpers import spec
 
 
@@ -186,6 +187,8 @@ class Client(object):
         else:
             self.connection = XenBusConnection(xen_bus_path)
 
+        self.events = deque()
+
     def __enter__(self):
         self.connection.connect()
         return self
@@ -197,9 +200,21 @@ class Client(object):
     # ............
 
     def send(self, type, payload):
-        # .. note:: `req_id` is allways 0 for now.
-        self.connection.send(str(Packet(type, payload, req_id=0)))
-        return self.connection.recv()
+        out_packet = Packet(type, payload)
+        self.connection.send(out_packet)
+
+        in_packet = self.connection.recv()
+        if not (in_packet.rq_id is out_packet.rq_id and
+                in_packet.tx_id is out_packet.tx_id):
+            raise UnexpectedPacket(in_packet)
+
+        # Incoming packet should either be a watch event or have the
+        # same operation type as the packet sent.
+        if (in_packet.op is not out_packet.op and
+            in_packet.op is Op.WATCH_EVENT):
+            self.events.append(in_packet)
+
+        return in_packet
 
     def command(self, type, *args):
         packet = self.send(type, "".join(args))
@@ -209,7 +224,7 @@ class Client(object):
         if not packet:
             raise RuntimeError(packet.payload[:-1])
         else:
-            return packet.payload.rstrip("\x00")
+            return packet.payload
 
     # Public API.
     # ...........
@@ -261,7 +276,7 @@ class Client(object):
 
         :param str path: path to list.
         """
-        return self.command(Op.DIRECTORY, path).split("\x00")
+        return self.command(Op.DIRECTORY, path).rstrip("\x00").split("\x00")
 
     @spec("<path>|")
     def get_perms(self, path):
@@ -271,7 +286,7 @@ class Client(object):
 
         :param str path: path to get permissions for.
         """
-        return self.command(Op.GET_PERMS, path).split("\x00")
+        return self.command(Op.GET_PERMS, path).rstrip("\x00").split("\x00")
 
     @spec("<path>|", "<perms>|+")
     def set_perms(self, path, perms):
@@ -307,13 +322,20 @@ class Client(object):
         """
         return self.command(Op.UNWATCH, wpath, token)
 
-    def watch_event(self):
+    def wait(self):
         """Waits for any of the watched paths to generate an event,
         which is a ``(path, token)`` pair, where the first element
         is event path, i.e. the actual path that was modified and
         second element is a token, passed to the :meth:`watch`.
         """
-        return Event(*self.command(Op.WATCH_EVENT).split("\x00"))
+        if self.events:
+            return self.events.popleft()
+
+        while True:
+            packet = self.connection.recv()
+
+            if packet.op is Op.WATCH_EVENT:
+                return Event(*packet.payload.rstrip("\x00").split("\x00"))
 
     @spec("<domid>|")
     def get_domain_path(self, domid):
@@ -337,7 +359,7 @@ class Client(object):
         return {
             "T": True,
             "F": False
-        }.get(self.command(Op.IS_DOMAIN_INTRODUCED, domid))
+        }.get(self.command(Op.IS_DOMAIN_INTRODUCED, domid).rstrip("\x00"))
 
     @spec("<domid>|", "<mfn>|", "<eventchn>|")
     def introduce(self, domid, mfn, eventchn):

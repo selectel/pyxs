@@ -48,16 +48,16 @@ Operations = Op = namedtuple("Operations", [
 Event = namedtuple("Event", "path token")
 
 
-class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
+class Packet(namedtuple("_Packet", "op rq_id tx_id len payload")):
     """A single message to or from XenStore.
 
     :param int op: an item from :data:`Op`, representing
                    operation, performed by this packet.
     :param bytes payload: packet payload, should be a valid ASCII-string
                           with characters between ``[0x20;0x7f]``.
-    :param int req_id: request id -- hopefuly a **unique** identifier
-                       for this packet, XenStore simply echoes this value
-                       back in reponse.
+    :param int rq_id: request id -- hopefuly a **unique** identifier
+                      for this packet, XenStore simply echoes this value
+                      back in reponse.
     :param int tx_id: transaction id, defaults to ``0`` -- which means
                       no transaction is running.
     """
@@ -65,7 +65,7 @@ class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
     #: for details.
     _fmt = b"IIII"
 
-    def __new__(cls, op, payload, req_id=0, tx_id=0):
+    def __new__(cls, op, payload, rq_id=0, tx_id=0):
         if isinstance(payload, unicode):
             payload = payload.encode("utf-8")
 
@@ -78,7 +78,7 @@ class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
             raise InvalidOperation(op)
 
         return super(Packet, cls).__new__(cls,
-            op, req_id, tx_id , len(payload), payload)
+            op, rq_id, tx_id , len(payload), payload)
 
     def __str__(self):
         # Note the ``[:-1]`` slice -- the actual payload is excluded.
@@ -97,9 +97,9 @@ class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
         if isinstance(s, unicode):
             s = s.encode("utf-8")
 
-        op, req_id, tx_id, l = map(int,
+        op, rq_id, tx_id, l = map(int,
             struct.unpack(cls._fmt, s[:struct.calcsize(cls._fmt)]))
-        return cls(op, s[-l:], req_id, tx_id)
+        return cls(op, s[-l:], rq_id, tx_id)
 
     @classmethod
     def from_file(cls, f):
@@ -108,6 +108,6 @@ class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
         .. note:: The caller is responsible for handling any possible
                   exceptions.
         """
-        op, req_id, tx_id, l = map(int,
+        op, rq_id, tx_id, l = map(int,
             struct.unpack(cls._fmt, f.read(struct.calcsize(cls._fmt))))
-        return cls(op, f.read(l), req_id, tx_id)
+        return cls(op, f.read(l), rq_id, tx_id)

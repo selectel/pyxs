@@ -11,7 +11,7 @@
 
 __all__ = [
     "InvalidOperation", "InvalidPayload", "InvalidPath", "InvalidTerm",
-    "InvalidPermission", "ConnectionError", "InvalidPacket"
+    "InvalidPermission", "ConnectionError", "UnexpectedPacket"
 ]
 
 
@@ -76,7 +76,7 @@ class ConnectionError(PyXSError):
     """Exception raised for failures during socket operations."""
 
 
-class InvalidPacket(ConnectionError):
+class UnexpectedPacket(ConnectionError):
     """Exception raised when recieved packet header doesn't match the
     header of the packet sent, for example if outgoing packet has
     ``op = Op.READ`` the incoming packet is expected to have
