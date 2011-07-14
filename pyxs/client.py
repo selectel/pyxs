@@ -78,7 +78,7 @@ class UnixSocketConnection(object):
                 self.disconnect()
 
             raise ConnectionError("Error {0} while writing to socket: {1}"
-                                  .format(e.args))
+                                  .format(*e.args))
 
     def recv(self):
         try:
@@ -88,7 +88,7 @@ class UnixSocketConnection(object):
                 self.disconnect()
 
             raise ConnectionError("Error {0} while reading from socket: {1}"
-                                  .format(e.args))
+                                  .format(*e.args))
 
 
 class XenBusConnection(object):
@@ -187,6 +187,7 @@ class Client(object):
             self.connection = XenBusConnection(xen_bus_path)
 
     def __enter__(self):
+        self.connection.connect()
         return self
 
     def __exit__(self, *exc_info):

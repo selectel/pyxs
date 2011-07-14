@@ -11,11 +11,15 @@
 
 __all__ = [
     "InvalidOperation", "InvalidPayload", "InvalidPath", "InvalidTerm",
-    "InvalidPermission", "ConnectionError"
+    "InvalidPermission", "ConnectionError", "InvalidPacket"
 ]
 
 
-class InvalidOperation(ValueError):
+class PyXSError(Exception):
+    """Base class for all :mod:`pyxs` exceptions."""
+
+
+class InvalidOperation(ValueError, PyXSError):
     """Exception raised when :class:`~pyxs._internal.Packet` is passed
     an operation, which isn't listed in :data:`~pyxs._internal.Op`.
 
@@ -23,7 +27,7 @@ class InvalidOperation(ValueError):
     """
 
 
-class InvalidPayload(ValueError):
+class InvalidPayload(ValueError, PyXSError):
     """Exception raised when :class:`~pyxs.Packet` is initialized with
     payload, which exceeds 4096 bytes restriction or contains a
     trailing ``NULL``.
@@ -32,7 +36,7 @@ class InvalidPayload(ValueError):
     """
 
 
-class InvalidPath(ValueError):
+class InvalidPath(ValueError, PyXSError):
     """Exception raised when a path proccessed by a comand doesn't
     match the following constraints:
 
@@ -47,7 +51,7 @@ class InvalidPath(ValueError):
 """
 
 
-class InvalidTerm(SyntaxError):
+class InvalidTerm(SyntaxError, PyXSError):
     """Exception raised by :func:`~pyxs.helpers.compile` when a given
     term is invalid, i. e. doesn't match any of the recognized forms.
 
@@ -55,7 +59,7 @@ class InvalidTerm(SyntaxError):
     """
 
 
-class InvalidPermission(ValueError):
+class InvalidPermission(ValueError, PyXSError):
     """Exception raised for permission which don't match the following
     format::
 
@@ -68,8 +72,13 @@ class InvalidPermission(ValueError):
     """
 
 
-class ConnectionError(Exception):
-    """Exception raised for failures during socket operations.
+class ConnectionError(PyXSError):
+    """Exception raised for failures during socket operations."""
 
-    :param str path: detailed error message.
+
+class InvalidPacket(ConnectionError):
+    """Exception raised when recieved packet header doesn't match the
+    header of the packet sent, for example if outgoing packet has
+    ``op = Op.READ`` the incoming packet is expected to have
+    ``op = Op.READ`` as well.
     """

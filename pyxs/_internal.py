@@ -56,7 +56,8 @@ class Packet(namedtuple("_Packet", "op req_id tx_id len payload")):
     :param bytes payload: packet payload, should be a valid ASCII-string
                           with characters between ``[0x20;0x7f]``.
     :param int req_id: request id -- hopefuly a **unique** identifier
-                       for this packet.
+                       for this packet, XenStore simply echoes this value
+                       back in reponse.
     :param int tx_id: transaction id, defaults to ``0`` -- which means
                       no transaction is running.
     """
