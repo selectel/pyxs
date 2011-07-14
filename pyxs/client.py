@@ -117,51 +117,7 @@ class XenBusConnection(object):
             #           of XenBus interface -- ``/kern/xen/...`.
             path = "/proc/xen/xsd_kva"
 
-        self.path = path
-        self.mmap = None
-
-    def connect(self):
-        if self.mmap:
-            return
-
-        try:
-            # .. note:: The following will only work with a `patched`
-            #           version of `mmap` module, which allows working
-            #           with zero-sized files.
-            self.mmap = mmap.mmap(os.open(self.path, os.O_RDWR),
-                                  resource.getpagesize())
-        except (IOError, OSError) as e:
-            raise ConnectionError("Error while opening {0}: {1}"
-                                  .format(self.path, e))
-
-    def disconnect(self):
-        if self.mmap is None:
-            return
-
-        try:
-            self.mmap.close()
-        except OSError: pass
-
-        self.mmap = None
-
-    def send(self, packet):
-        if not self.mmap:
-            self.connect()
-
-        try:
-            self.mmap.write(str(packet))
-        except IOError as e:
-            # .. todo:: convert exception to `pyxs` format.
-            raise ConnectionError("Error while writing to XenBus: {0}"
-                                  .format(*e.args))
-
-    def recv(self):
-        try:
-            return Packet.from_file(self.mmap)
-        except IOError as e:
-            # .. todo:: convert exception to `pyxs` format.
-            raise ConnectionError("Error while reading from XenBus: {0}"
-                                  .format(*e.args))
+        raise NotImplemented("... some day maybe <_<")
 
 
 class Client(object):
