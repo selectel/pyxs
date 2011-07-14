@@ -3,13 +3,12 @@
     pyxs
     ~~~~
 
-    Pure Python bindings for communicating with XenStore. Even though
-    there're two ways talking to XenStore:
+    Pure Python bindings for communicating with XenStore. Currently two
+    backend options are available:
 
     * over a Unix socket with :class:`~pyxs.client.UnixSocketConnection`;
     * over XenBus_ with :class:`~pyxs.client.XenBusConnection`.
 
-    **The latter one is the only one fully functional, at the moment.**
     Which backend is used is determined by the arguments used for
     :class:`~pyxs.client.Client` initialization, for example the
     following code creates a :class:`~pyxs.client.Client` instance,
@@ -34,4 +33,3 @@
 from .client import Client
 from .exceptions import PyXSError, ConnectionError, UnexpectedPacket, \
     InvalidOperation, InvalidPath, InvalidPayload, InvalidTerm
-
