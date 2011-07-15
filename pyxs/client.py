@@ -5,9 +5,9 @@
 
     This module implements XenStore client, which uses multiple connection
     options for communication: :class:`UnixSocketConnection` and
-    :class:`XenBusConnection`. Note however, that the latter one is
-    not yet complete and should not be used, unless you know what
-    you're doing.
+    :class:`XenBusConnection`. Note however, that the latter one can
+    be a bit buggy, when dealing with ``WATCH_EVENT`` packets, so
+    using :class:`UnixSocketConnection` is preferable.
 
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
 """
@@ -238,8 +238,9 @@ class Client(object):
             elif packet.op is not op:
                 raise UnexpectedPacket(packet)
             # Making sure sent and recieved packets are within the same
-            # transaction -- not relevant for # `XenBusConnection` for
-            # some reason -- BEWARE!
+            # transaction -- not relevant for # `XenBusConnection`, for
+            # some reason it sometimes returns *random* values of tx_id
+            # and rq_id.
             elif (not isinstance(self.connection, XenBusConnection) and
                   packet.tx_id is not self.tx_id):
                 raise UnexpectedPacket(packet)
