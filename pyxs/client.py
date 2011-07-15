@@ -111,23 +111,14 @@ class UnixSocketConnection(FileDescriptorConnection):
             return
 
         try:
-            # XXX Generally speaking, this `socket` instance is redundant,
-            # but we still need to reference it, to keep it away from
-            # the GC, because `socket.__del__()` closes the
-            # corresponding fd.
-            self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            self.socket.settimeout(self.socket_timeout)
-            self.socket.connect(self.path)
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.settimeout(self.socket_timeout)
+            sock.connect(self.path)
         except socket.error as e:
             raise ConnectionError("Error connecting to {0!r}: {1}"
                                   .format(self.path, e.args))
         else:
-            self.fd = self.socket.fileno()
-
-    def disconnect(self):
-        super(UnixSocketConnection, self).disconnect()
-
-        self.socket = None
+            self.fd = os.dup(sock.fileno())
 
 
 class XenBusConnection(FileDescriptorConnection):
