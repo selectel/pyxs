@@ -16,6 +16,7 @@ from __future__ import absolute_import
 
 __all__ = ["Client", "UnixSocketConnection", "XenBusConnection"]
 
+import copy
 import errno
 import os
 import platform
@@ -102,10 +103,8 @@ class UnixSocketConnection(FileDescriptorConnection):
         self.path = path
         self.socket_timeout = None
 
-    @property
-    def args(self):
-        return {"unix_socket_path": self.path,
-                "socket_timeout": self.socket_timeout}
+    def __copy__(self):
+        return self.__class__(self.path, self.socket_timeout)
 
     def connect(self):
         if self.fd:
@@ -155,9 +154,8 @@ class XenBusConnection(FileDescriptorConnection):
 
         self.path = path
 
-    @property
-    def args(self):
-        return {"xen_bus_path": self.path}
+    def __copy__(self):
+        return self.__class__(self.path)
 
     def connect(self):
         if self.fd:
@@ -199,8 +197,10 @@ class Client(object):
     'baz'
     """
     def __init__(self, unix_socket_path=None, socket_timeout=None,
-                 xen_bus_path=None, transaction=None):
-        if unix_socket_path or not xen_bus_path:
+                 xen_bus_path=None, connection=None, transaction=None):
+        if connection:
+            self.connection = connection
+        elif unix_socket_path or not xen_bus_path:
             self.connection = UnixSocketConnection(
                 unix_socket_path, socket_timeout=socket_timeout)
         else:
@@ -465,4 +465,5 @@ class Client(object):
         if self.tx_id:
             raise PyXSError(errno.EALREADY, os.strerror(errno.EALREADY))
 
-        return Client(transaction=True, **self.connection.args)
+        return Client(connection=copy.copy(self.connection),
+                      transaction=True)
