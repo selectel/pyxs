@@ -64,7 +64,7 @@ def compile(term):
         else:
             raise InvalidTerm(term)
 
-        v.__name__ = name
+        v.__name__ = name.encode("utf-8")
         v.null_ending = bool(null_ending)
 
         return v

@@ -12,7 +12,7 @@
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
 """
 
-from __future__ import absolute_import
+from __future__ import absolute_import, unicode_literals
 
 __all__ = ["Client", "UnixSocketConnection", "XenBusConnection"]
 
@@ -463,6 +463,20 @@ class Client(object):
             self.tx_id = 0
 
     def transaction(self):
+        """Returns a new :class:`Client` instance, operating within a
+        new transaction; can only be used only when no transaction is
+        running. Here's an example:
+
+        >>> with Client().transaction() as t:
+        ...     t.do_something()
+        ...     t.transaction_end(commit=True)
+
+        However, the last line is completely optional, since the default
+        behaviour is to commit everything on context manager exit.
+
+        :raises pyxs.exceptions.PyXSError: if this client is linked to
+                                           and active transaction.
+        """
         if self.tx_id:
             raise PyXSError(errno.EALREADY, os.strerror(errno.EALREADY))
 
