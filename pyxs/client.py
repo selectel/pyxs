@@ -225,8 +225,9 @@ class Client(object):
     # Private API.
     # ............
 
-    def communicate(self, op, *args):
-        self.connection.send(Packet(op, "".join(args), tx_id=self.tx_id))
+    def communicate(self, op, *args, **kwargs):
+        kwargs["tx_id"] = self.tx_id  # Forcing ``tx_id`` here.
+        self.connection.send(Packet(op, "".join(args), **kwargs))
 
         packet = self.connection.recv()
 
