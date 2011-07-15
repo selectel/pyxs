@@ -140,8 +140,8 @@ def validate_path(path):
         raise InvalidPath(path)
 
     # A path is not allowed to have a trailing /, except for the
-    # root path.
-    if len(path) > 1 and path[-1] == b"/":
+    # root path and shouldn't have dount //'s.
+    if (len(path) > 1 and path[-1] == b"/") or b"//" in path:
         raise InvalidPath(path)
 
 
@@ -152,8 +152,8 @@ def validate_wpath(wpath):
     :param bytes wpath: watch path to check.
     :raises pyxs.exceptions.InvalidPath: when path fails to validate.
     """
-    if (wpath.startswith("@") and not
-        re.match("^@(?:introduceDomain|releaseDomain)\x00?$", wpath)):
+    if (wpath.startswith(b"@") and not
+        re.match(b"^@(?:introduceDomain|releaseDomain)\x00?$", wpath)):
         raise InvalidPath(wpath)
     else:
         validate_path(wpath)
@@ -168,7 +168,7 @@ def validate_perms(perms):
         when any of the permissions fail to validate.
     """
     for perm in perms:
-        if not re.match("[wrbn]\d+", perm):
+        if not re.match(b"[wrbn]\d+", perm):
             raise InvalidPermission(perm)
 
 

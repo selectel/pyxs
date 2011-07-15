@@ -92,6 +92,10 @@ def test_validate_path():
     with pytest.raises(InvalidPath):
         validate_path("/foo/")
 
+    # d) no //'s!
+    with pytest.raises(InvalidPath):
+        validate_path("/foo//bar")
+
     try:
         validate_path("/")
     except InvalidPath as p:
