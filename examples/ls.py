@@ -42,7 +42,9 @@ if __name__ == "__main__":
     else:
         connection = XenBusConnection()
 
+    [path] = args[:1] or ["/"]
+
     try:
-        traverse(Client(connection=connection), *args[:1])
+        traverse(Client(connection=connection), path)
     except PyXSError as e:
         print(e)
