@@ -10,6 +10,9 @@
 
 from __future__ import unicode_literals
 
+__all__ = ["dict_merge", "validate_path", "validate_watch_path",
+           "validate_perms", "force_bytes"]
+
 import re
 import posixpath
 from future_builtins import map
