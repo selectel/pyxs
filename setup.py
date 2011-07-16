@@ -47,7 +47,7 @@ class PyTest(Command):
 
 
 setup(name="pyxs",
-      version="0.1",
+      version="0.2",
       packages=["pyxs"],
       cmdclass={"test": PyTest},
       platforms=["any"],
