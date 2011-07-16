@@ -18,14 +18,15 @@ __all__ = ["Client"]
 
 import copy
 import errno
+import operator
 import re
 from collections import deque
 
 from ._internal import Event, Packet, Op
+from .connection import UnixSocketConnection, XenBusConnection
 from .exceptions import UnexpectedPacket, PyXSError
 from .helpers import validate_path, validate_watch_path, validate_perms, \
     dict_merge, force_bytes, error
-from .connection import UnixSocketConnection, XenBusConnection
 
 
 class Client(object):
@@ -64,8 +65,7 @@ class Client(object):
             lambda p, *perms: validate_path(p) and validate_perms(perms)),
         dict.fromkeys([Op.GET_DOMAIN_PATH, Op.IS_DOMAIN_INTRODUCED,
                        Op.INTRODUCE, Op.RELEASE, Op.SET_TARGET],
-            lambda v: isinstance(v, (int, long)) or \
-                      isinstance(v, basestring) and v.isdigit()),
+                      operator.methodcaller("isdigit")),
         dict.fromkeys([Op.UNWATCH], validate_watch_path),
         dict.fromkeys([Op.WATCH], lambda p, t: validate_watch_path(p))
     )
@@ -107,13 +107,11 @@ class Client(object):
     # ............
 
     def execute_command(self, op, *args, **kwargs):
-        if not self.COMMAND_VALIDATORS.get(op,
-                                           lambda *args: True)(*args):
-            raise ValueError(args)
-
         args = [force_bytes(arg) + b"\x00" for arg in args]
 
-        if not all(re.match("^[\x00\x20-\x7f]+$", arg) for arg in args):
+        if not self.COMMAND_VALIDATORS.get(op, lambda *args: True)(*args):
+            raise ValueError(args)
+        elif not all(re.match("^[\x00\x20-\x7f]+$", arg) for arg in args):
             raise ValueError(arg)
 
         kwargs["tx_id"] = self.tx_id  # Forcing ``tx_id`` here.
