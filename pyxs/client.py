@@ -70,6 +70,13 @@ class Client(object):
         dict.fromkeys([Op.WATCH], lambda p, t: validate_watch_path(p))
     )
 
+    #: A flag, which is ``True`` if we're operating on control domain
+    #: and else otherwise.
+    try:
+        SU = open("/proc/xen/capabilities").read() == "control_d"
+    except (IOError, OSError):
+        SU = False
+
     def __init__(self, unix_socket_path=None, socket_timeout=None,
                  xen_bus_path=None, connection=None, transaction=None):
         if connection:
@@ -281,6 +288,9 @@ class Client(object):
         :param long mfn: address of xenstore page in `domid`.
         :param int eventch: an unbound event chanel in `domid`.
         """
+        if not domid:
+            raise ValueError("Dom0 cannot be introduced.")
+
         self.ack(Op.INTRODUCE, domid, mfn, eventchn)
 
     def release(self, domid):
@@ -291,9 +301,10 @@ class Client(object):
 
         .. note:: ``xenstored`` will in any case detect domain
                   destruction and disconnect by itself.
-
-        .. todo:: make sure it's only executed from Dom0.
         """
+        if not self.su:
+            raise error(errno.EPERM)
+
         self.ack(Op.RELEASE, domid)
 
     def resume(self, domid):
@@ -302,9 +313,10 @@ class Client(object):
         appropriate watches.
 
         :param int domid: domain to resume.
-
-        .. todo:: make sure it's only executed from Dom0.
         """
+        if not self.su:
+            raise error(errno.EPERM)
+
         self.ack(Op.RESUME, domid)
 
     def set_target(self, domid, target):
@@ -316,9 +328,10 @@ class Client(object):
 
         :param int domid: domain to set target for.
         :param int target: target domain (yours truly, Captain).
-
-        .. todo:: make sure it's only executed from Dom0.
         """
+        if not self.su:
+            raise error(errno.EPERM)
+
         self.ack(Op.SET_TARGET, domid, target)
 
     def transaction_start(self):
