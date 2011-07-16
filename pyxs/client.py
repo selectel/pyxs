@@ -197,8 +197,6 @@ class Client(object):
 
     def directory(self, path):
         """Returns a list of names of the immediate children of `path`.
-        The resulting children are each named as
-        ``<path>/<child-leaf-name>``.
 
         :param str path: path to list.
         """
