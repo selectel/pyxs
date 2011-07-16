@@ -18,20 +18,14 @@ __all__ = ["Client"]
 
 import copy
 import errno
-import os
 import re
 from collections import deque
 
 from ._internal import Event, Packet, Op
 from .exceptions import UnexpectedPacket, PyXSError
 from .helpers import validate_path, validate_watch_path, validate_perms, \
-    dict_merge, force_bytes
+    dict_merge, force_bytes, error
 from .connection import UnixSocketConnection, XenBusConnection
-
-
-#: A reverse mapping for :data:`errno.errorcode`.
-_codeerror = dict((message, code)
-                  for code, message in errno.errorcode.iteritems())
 
 
 class Client(object):
@@ -127,8 +121,7 @@ class Client(object):
             # According to ``xenstore.txt`` erroneous responses start with
             # a capital E and end with ``NULL``-byte.
             if packet.op is Op.ERROR:
-                error = _codeerror.get(packet.payload[:-1], 0)
-                raise PyXSError(error, os.strerror(error))
+                raise error(packet.payload[:-1])
             # Incoming packet should either be a watch event or have the
             # same operation type as the packet sent.
             elif packet.op is Op.WATCH_EVENT:
@@ -359,7 +352,7 @@ class Client(object):
                                            and active transaction.
         """
         if self.tx_id:
-            raise PyXSError(errno.EALREADY, os.strerror(errno.EALREADY))
+            raise error(errno.EALREADY)
 
         return Client(connection=copy.copy(self.connection),
                       transaction=True)

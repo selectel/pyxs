@@ -11,13 +11,20 @@
 from __future__ import unicode_literals
 
 __all__ = ["dict_merge", "validate_path", "validate_watch_path",
-           "validate_perms", "force_bytes"]
+           "validate_perms", "force_bytes", "error"]
 
+import errno
 import re
+import os
 import posixpath
 from future_builtins import map
 
-from .exceptions import InvalidPath, InvalidPermission
+from .exceptions import InvalidPath, InvalidPermission, PyXSError
+
+
+#: A reverse mapping for :data:`errno.errorcode`.
+_codeerror = dict((message, code)
+                  for code, message in errno.errorcode.iteritems())
 
 
 def dict_merge(*dicts):
@@ -31,6 +38,21 @@ def dict_merge(*dicts):
     base = {}
     map(base.update, dicts)
     return base
+
+
+def error(smth):
+    """Returns a :class:`~pyxs.exceptions.PyXSError` matching a given
+    errno or error name.
+
+    >>> error(22)
+    pyxs.exceptions.PyXSError: (22, 'Invalid argument')
+    >>> error("EINVAL")
+    pyxs.exceptions.PyXSError: (22, 'Invalid argument'
+    """
+    if isinstance(smth, basestring):
+        smth = _codeerror.get(smth, 0)
+
+    return PyXSError(smth, os.strerror(smth))
 
 
 def validate_path(path):
