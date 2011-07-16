@@ -154,6 +154,8 @@ class Client(object):
         """
         return self.execute_command(Op.READ, path)
 
+    __getitem__ = read
+
     def write(self, path, value):
         """Writes data to a given path.
 
@@ -162,6 +164,8 @@ class Client(object):
         :param str path: a path to write to.
         """
         self.ack(Op.WRITE, path, value)
+
+    __setitem__ = write
 
     def mkdir(self, path):
         """Ensures that a given path exists, by creating it and any
@@ -181,6 +185,8 @@ class Client(object):
         :param str path: path to directory to remove.
         """
         self.ack(Op.RM, path)
+
+    __delitem__ = rm
 
     def directory(self, path):
         """Returns a list of names of the immediate children of `path`.
