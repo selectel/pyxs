@@ -32,4 +32,4 @@
 
 from .client import Client
 from .exceptions import PyXSError, ConnectionError, UnexpectedPacket, \
-    InvalidOperation, InvalidPath, InvalidPayload, InvalidTerm
+    InvalidOperation, InvalidPath, InvalidPayload

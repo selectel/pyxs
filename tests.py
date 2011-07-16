@@ -6,9 +6,8 @@ import pytest
 
 from pyxs._internal import Op, Packet
 from pyxs.exceptions import InvalidOperation, InvalidPayload, InvalidPath, \
-    InvalidTerm, InvalidPermission
-from pyxs.helpers import compile, spec, validate_path, validate_wpath, \
-    validate_perms
+    InvalidPermission
+from pyxs.helpers import validate_path, validate_watch_path, validate_perms
 
 
 def test_packet():
@@ -22,54 +21,6 @@ def test_packet():
 
 
 # Helpers.
-
-def test_compile():
-    # a) <foo> -- non-empty string with no NULL bytes.
-    v = compile("<foo>")
-    assert v("foo")
-    assert not v("foo\x07")
-    assert not v("foo\x00")
-    assert not v("f\x00oo")
-    assert not v("")
-
-    # b) <foo|> -- non-empty string with zero or more NULL bytes.
-    v = compile("<foo|>")
-    assert v("foo")
-    assert v("foo\x00")
-    assert v("f\x00\x00oo")
-    assert not v("foo\x07")
-    assert not v("")
-
-    # c) <foo>| -- non-empty string with no NULL bytes, followed by a
-    #    trailing NULL.
-    v = compile("<foo>|")
-    assert v("foo\x00")
-    assert not v("\x00")
-    assert not v("f\x00oo\x00")
-    assert not v("")
-
-    # d) <foo>|* -- zero or more non-empty strings with no NULL bytes,
-    #    followed by a trailing NULL.
-    v = compile("<foo>|*")
-    assert v([])
-    assert v(["foo\x00"])
-    assert v(["foo\x00", "bar\x00"])
-    assert not v(["foo\x00", "bar\x00", "\x00"])
-    assert not v(["\x00"])
-
-    # e) <foo>|+ -- one or more non-empty strings with no NULL bytes,
-    #    followed by a trailing NULL.
-    v = compile("<foo>|+")
-    assert v(["foo\x00"])
-    assert v(["foo\x00", "bar\x00"])
-    assert not v(["foo\x00", "bar\x00", "\x00"])
-    assert not v(["\x00"])
-    assert not v([])
-
-    # f) invalid term syntax.
-    for term in ["<foo", "<foo><bar>", "<foo >"]:
-        with pytest.raises(InvalidTerm):
-            compile(term)
 
 
 def test_validate_path():
@@ -102,25 +53,25 @@ def test_validate_path():
         pytest.fail("{0} is prefectly valid, baby :)".format(p.args))
 
 
-def test_validate_wpath():
+def test_validate_watch_path():
     # a) ordinary path should be checked with `validate_path()`
     with pytest.raises(InvalidPath):
-        validate_wpath("/foo/")
+        validate_watch_path("/foo/")
 
     with pytest.raises(InvalidPath):
-        validate_wpath("/fo\x07o")
+        validate_watch_path("/fo\x07o")
 
     with pytest.raises(InvalidPath):
-        validate_wpath("/$/foo")
+        validate_watch_path("/$/foo")
 
     # b) special path options are limited to `@introduceDomain` and
     #    `@releaseDomain`.
     with pytest.raises(InvalidPath):
-        validate_wpath("@foo")
+        validate_watch_path("@foo")
 
     try:
-        validate_wpath("@introduceDomain")
-        validate_wpath("@releaseDomain")
+        validate_watch_path("@introduceDomain")
+        validate_watch_path("@releaseDomain")
     except InvalidPath as p:
         pytest.fail("{0} is prefectly valid, baby :)".format(p.args))
 
@@ -141,34 +92,3 @@ def test_validate_perms():
         validate_perms(["w999999"])  # valid, even though it overflows int32.
     except InvalidPermission as p:
         pytest.fail("{0} is prefectly valid, baby :)".format(p.args))
-
-
-def test_spec():
-    @spec("<a|>", "<b>|+", "<c>")
-    def foo(self, a, b, c):
-        return True
-
-    # a) checking that ``__spec__`` atribute is updated.
-    assert hasattr(foo, "__spec__")
-    assert len(foo.__spec__) == 3
-    a, b, c = foo.__spec__
-
-    assert a.null_ending == False
-    assert b.null_ending == True
-    assert c.null_ending == False
-
-    # b) checking valid argument cases.
-    for args in [("foo\x00", ["bar\x00"], "baz"),
-                 ("foo\x00", ["bar\x00", "baz\x00"], "baz")]:
-        try:
-            assert foo(None, *args)
-        except ValueError:
-            pytest.fail("No error should've been raised for {0}"
-                        .format(args))
-
-    # c) time for some errors.
-    for args in [("fo\x07o", ["bar\x00"], "baz"),
-                 ("foo\x00", [], "baz"),
-                 ("foo\x00", [], "\x00")]:
-        with pytest.raises(ValueError):
-            foo(None, *args)
