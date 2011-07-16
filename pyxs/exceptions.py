@@ -51,14 +51,6 @@ class InvalidPath(ValueError, PyXSError):
 """
 
 
-class InvalidTerm(SyntaxError, PyXSError):
-    """Exception raised by :func:`~pyxs.helpers.compile` when a given
-    term is invalid, i. e. doesn't match any of the recognized forms.
-
-    :param bytes term: invalid term value.
-    """
-
-
 class InvalidPermission(ValueError, PyXSError):
     """Exception raised for permission which don't match the following
     format::

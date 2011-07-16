@@ -6,8 +6,8 @@
     Pure Python bindings for communicating with XenStore. Currently two
     backend options are available:
 
-    * over a Unix socket with :class:`~pyxs.client.UnixSocketConnection`;
-    * over XenBus_ with :class:`~pyxs.client.XenBusConnection`.
+    * over a Unix socket with :class:`~pyxs.connection.UnixSocketConnection`;
+    * over XenBus_ with :class:`~pyxs.connection.XenBusConnection`.
 
     Which backend is used is determined by the arguments used for
     :class:`~pyxs.client.Client` initialization, for example the
