@@ -10,8 +10,8 @@
 
 from __future__ import unicode_literals
 
-__all__ = ["dict_merge", "validate_path", "validate_watch_path",
-           "validate_perms", "force_bytes", "error"]
+__all__ = ["validate_path", "validate_watch_path", "validate_perms",
+           "error"]
 
 import errno
 import re
@@ -25,6 +25,18 @@ from .exceptions import InvalidPath, InvalidPermission, PyXSError
 #: A reverse mapping for :data:`errno.errorcode`.
 _codeerror = dict((message, code)
                   for code, message in errno.errorcode.iteritems())
+
+
+def writeall(fd, data):
+    """Writes a data string to the file descriptor.
+
+    Calls :func:`os.write` repeatidly, unless all data is written.
+    If an error occurs, it's imposible to tell how much data has
+    been written.
+    """
+    length = len(data)
+    while length:
+        length -= os.write(fd, data)
 
 
 def dict_merge(*dicts):

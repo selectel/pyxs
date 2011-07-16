@@ -19,6 +19,7 @@ import platform
 import socket
 
 from .exceptions import ConnectionError
+from .helpers import writeall
 from ._internal import Packet
 
 
@@ -50,7 +51,7 @@ class FileDescriptorConnection(object):
             self.connect()
 
         try:
-            return os.write(self.fd, str(packet))
+            writeall(self.fd, str(packet))
         except OSError as e:
             if e.args[0] is errno.EPIPE:
                 self.disconnect()
