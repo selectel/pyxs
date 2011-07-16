@@ -249,13 +249,15 @@ class Client(object):
         second element is a token, passed to the :meth:`watch`.
         """
         if self.events:
-            return self.events.popleft()
+            packet = self.events.popleft()
+        else:
+            while True:
+                packet = self.connection.recv()
 
-        while True:
-            packet = self.connection.recv()
+                if packet.op is Op.WATCH_EVENT:
+                    break
 
-            if packet.op is Op.WATCH_EVENT:
-                return Event(*packet.payload.split(b"\x00")[:-1])
+        return Event(*packet.payload.split(b"\x00")[:-1])
 
     def get_domain_path(self, domid):
         """Returns the domain's base path, as is used for relative
