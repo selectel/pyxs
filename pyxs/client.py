@@ -269,7 +269,7 @@ class Client(object):
         return self.execute_command(Op.GET_DOMAIN_PATH, domid)
 
     def is_domain_introduced(self, domid):
-        """Returns ``True` if ``xenstored`` is in communication with
+        """Returns ``True`` if ``xenstored`` is in communication with
         the domain; that is when `INTRODUCE` for the domain has not
         yet been followed by domain destruction or explicit
         `RELEASE`; and ``False`` otherwise.
