@@ -36,7 +36,7 @@ class FileDescriptorConnection(object):
         raise NotImplemented("__init__() should be overriden by subclasses.")
 
     def disconnect(self, silent=True):
-        """Disconnect from XenStore.
+        """Disconnects from XenStore.
 
         :param bool silent: if ``True`` (default), any errors, raised
                             while closing the file descriptor are
@@ -54,6 +54,12 @@ class FileDescriptorConnection(object):
             self.fd = None
 
     def send(self, packet):
+        """Sends a given packet to XenStore.
+
+        :param pyxs._internal.Packet packet: a packet to send, is
+            expected to be validated, since no checks are done at
+            that point.
+        """
         if not self.fd:
             self.connect()
 
@@ -67,6 +73,7 @@ class FileDescriptorConnection(object):
                                   .format(self.path, e.args))
 
     def recv(self):
+        """Recieves a packet from XenStore."""
         try:
             data = os.read(self.fd, Packet._struct.size)
         except OSError as e:
