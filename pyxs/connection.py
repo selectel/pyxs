@@ -35,14 +35,21 @@ class FileDescriptorConnection(object):
     def __init__(self):
         raise NotImplemented("__init__() should be overriden by subclasses.")
 
-    def disconnect(self):
+    def disconnect(self, silent=True):
+        """Disconnect from XenStore.
+
+        :param bool silent: if ``True`` (default), any errors, raised
+                            while closing the file descriptor are
+                            suppressed.
+        """
         if self.fd is None:
             return
 
         try:
             os.close(self.fd)
-        except OSError:
-            pass
+        except OSError as e:
+            if not silent:
+                raise ConnectionError(e.args)
         finally:
             self.fd = None
 

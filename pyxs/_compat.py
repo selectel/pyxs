@@ -17,7 +17,7 @@ from .exceptions import PyXSError as Error
 
 class xs(Client):
     def close(self):
-        self.connection.disconnect()
+        self.connection.disconnect(silent=False)
 
     def get_permissions(self, tx_id, path):
         self.tx_id = int(tx_id)
