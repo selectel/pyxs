@@ -1,0 +1,30 @@
+pyxs Changelog
+==============
+
+Here you can see the full list of changes between each pyxs release.
+
+Version 0.2
+-----------
+
+- Completely refactored validation -- no more @spec magic, everything
+  is checked implicitly inside `Client.execute_command()`.
+- Added a compatibility interface, which mimics `xen.lowlevel.xs`
+  behaviour, using `pyxs` as a backend.
+- Restricted `SET_TARGET`, `INTRODUCE` and `RELEASE` operations to
+  Dom0 only -- `/proc/xen/capabilities` is used to check domain
+  status.
+- Fixed a bug in `Client.wait()` -- queued watch events weren't wrapped
+  in `pyxs._internal.Event` class, unlike the received ones.
+
+Version 0.1
+-------------
+
+Initial release, released on July 16th
+
+- Added a complete implementation of XenStore protocol, including
+  transactions and path watching, see `pyxs.Client` for details.
+- Added generic validation helper -- `@spec`, which forces arguments
+  to match the scheme from the wire protocol specification.
+- Added two connection backends -- `XenBusConnection` for connecting
+  from DomU through a block device and `UnixSocketConnection`,
+  communicating with ``xenstored`` via a Unix domain socket.
