@@ -19,8 +19,9 @@
     >>> Client()
     <pyxs.client.Client object at 0xb74109cc>
 
-    Use ``xen_bus_path``, if initialize a :class:`~pyxs.client.Client`
-    over XenBus_:
+    Use ``xen_bus_path`` argument to initialize a
+    :class:`~pyxs.client.Client`, communicating with XenStore over
+    XenBus_:
 
     >>> Client(xen_bus_path="/proc/xen/xenbus")
     <pyxs.client.Client object at 0xb7410d2c>
