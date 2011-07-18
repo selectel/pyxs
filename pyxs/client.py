@@ -72,7 +72,7 @@ class Client(object):
     #: A flag, which is ``True`` if we're operating on control domain
     #: and else otherwise.
     try:
-        SU = open("/proc/xen/capabilities").read() == "control_d"
+        SU = open("/proc/xen/capabilities").read() == "control_d\n"
     except (IOError, OSError):
         SU = False
 
