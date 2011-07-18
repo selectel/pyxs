@@ -13,6 +13,14 @@ from pyxs._internal import Op, Packet
 from pyxs.helpers import validate_path, validate_watch_path, validate_perms
 
 
+def setup_function(f):
+    try:
+        with Client() as c:
+            c.rm("/foo")
+    except PyXSError:
+        pass
+
+
 # Internal.
 
 
@@ -257,12 +265,8 @@ def test_client_read():
             assert e.args[0] is errno.ENOENT
 
         # b) OK-case.
-        try:
-            assert c.read("/local/domain/0/domid") == "0"
-            assert c["/local/domain/0/domid"] == "0"
-        except PyXSError as e:
-            pytest.fail("No error should've been raised, got: {0}"
-                        .format(e))
+        assert c.read("/local/domain/0/domid") == "0"
+        assert c["/local/domain/0/domid"] == "0"
 
         # c) No read permissions (should be ran in DomU)?
 
@@ -272,16 +276,65 @@ def test_write():
     for backend in [UnixSocketConnection, XenBusConnection]:
         c = Client(connection=backend())
 
-        # a) OK-case.
-        try:
-            c.write("/foo/bar", "baz")
-            assert c.read("/foo/bar") == "baz"
+        c.write("/foo/bar", "baz")
+        assert c.read("/foo/bar") == "baz"
 
-            c["/foo/bar"] = "boo"
-            assert c["/foo/bar"] == "boo"
+        c["/foo/bar"] = "boo"
+        assert c["/foo/bar"] == "boo"
+
+        # b) No write permissions (should be ran in DomU)?
+
+
+@virtualized
+def test_mkdir():
+    for backend in [UnixSocketConnection, XenBusConnection]:
+        c = Client(connection=backend())
+
+        c.mkdir("/foo/bar")
+        assert c.directory("/foo") == ["bar"]
+
+        # FIXME: hangs for ``XenBusConnection``!
+        if backend is not XenBusConnection:
+            assert c.read("/foo/bar") == ""
+
+
+@virtualized
+def test_rm():
+    for backend in [UnixSocketConnection, XenBusConnection]:
+        c = Client(connection=backend())
+        c.mkdir("/foo/bar")
+
+        try:
+            c.rm("/foo/bar")
+        except PyXSError as e:
+            pytest.fail("No error should've been raised, got: {0}"
+                        .format(e))
+
+        with pytest.raises(PyXSError):
+            c.read("/foo/bar")
+
+        # FIXME: hangs for ``XenBusConnection``!
+        if backend is not XenBusConnection:
+            assert c.read("/foo") == ""
+
+
+@virtualized
+def test_directory():
+    for backend in [UnixSocketConnection, XenBusConnection]:
+        c = Client(connection=backend())
+        c.mkdir("/foo/bar")
+
+        # a) OK-case.
+        assert c.directory("/foo") == ["bar"]
+
+        # FIXME: hangs for ``XenBusConnection``!
+        if backend is not XenBusConnection:
+            assert c.directory("/foo/bar") == [""]
+
+        # b) directory doesn't exist.
+        try:
+            c.directory("/path/to/something")
         except PyXSError as e:
             assert e.args[0] is errno.ENOENT
-        finally:
-            c.rm("/foo/bar")
 
-        # b) No read permissions (should be ran in DomU)?
+        # c) No list permissions (should be ran in DomU)?
