@@ -17,6 +17,10 @@ import errno
 import os
 import platform
 import socket
+import sys
+
+if sys.version_info[0] is not 3:
+    bytes, str = str, unicode
 
 from .exceptions import ConnectionError
 from .helpers import writeall
@@ -64,7 +68,7 @@ class FileDescriptorConnection(object):
             self.connect()
 
         try:
-            writeall(self.fd, str(packet))
+            writeall(self.fd, str(packet).encode("utf-8"))
         except OSError as e:
             if e.args[0] is errno.EPIPE:
                 self.disconnect()
@@ -84,7 +88,8 @@ class FileDescriptorConnection(object):
                                   .format(self.path, e.args))
         else:
             op, rq_id, tx_id, size = Packet._struct.unpack(data)
-            return Packet(op, os.read(self.fd, size), rq_id, tx_id)
+            return Packet(op, os.read(self.fd, size).decode("utf-8"),
+                          rq_id, tx_id)
 
 
 class UnixSocketConnection(FileDescriptorConnection):

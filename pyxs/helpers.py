@@ -17,14 +17,17 @@ import errno
 import re
 import os
 import posixpath
-from future_builtins import map
+import sys
+
+if sys.version_info[0] is not 3:
+    bytes, str = str, unicode
 
 from .exceptions import InvalidPath, InvalidPermission, PyXSError
 
 
 #: A reverse mapping for :data:`errno.errorcode`.
 _codeerror = dict((message, code)
-                  for code, message in errno.errorcode.iteritems())
+                  for code, message in errno.errorcode.items())
 
 
 def writeall(fd, data):
@@ -36,7 +39,7 @@ def writeall(fd, data):
     """
     length = len(data)
     while length:
-        length -= os.write(fd, data)
+        length -= os.write(fd, data[-length:])
 
 
 def dict_merge(*dicts):
@@ -48,8 +51,11 @@ def dict_merge(*dicts):
     {'foo': 'bar', 'baz': 'boo'}
     """
     base = {}
-    map(base.update, dicts)
-    return base
+
+    for d in dicts:
+        base.update(d)
+    else:
+        return base
 
 
 def error(smth):
@@ -59,7 +65,7 @@ def error(smth):
     >>> error(22)
     pyxs.exceptions.PyXSError: (22, 'Invalid argument')
     >>> error("EINVAL")
-    pyxs.exceptions.PyXSError: (22, 'Invalid argument'
+    pyxs.exceptions.PyXSError: (22, 'Invalid argument')
     """
     if isinstance(smth, basestring):
         smth = _codeerror.get(smth, 0)
@@ -67,11 +73,27 @@ def error(smth):
     return PyXSError(smth, os.strerror(smth))
 
 
+def force_unicode(value):
+    """Coerces a given value to :func:`unicode`.
+
+    >>> force_bytes(b"foo")
+    u'foo'
+    >>> force_bytes(None)
+    u'None'
+    """
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    elif hasattr(value, "__iter__"):
+        list(map(force_unicode, value))
+    else:
+        return str(value)
+
+
 def validate_path(path):
     """Checks if a given path is valid, see
     :exc:`~pyxs.exceptions.InvalidPath` for details.
 
-    :param bytes path: path to check.
+    :param str path: path to check.
     :raises pyxs.exceptions.InvalidPath: when path fails to validate.
     """
     # Paths longer than 3072 bytes are forbidden; clients specifying
@@ -84,7 +106,7 @@ def validate_path(path):
 
     # A path is not allowed to have a trailing /, except for the
     # root path and shouldn't have dount //'s.
-    if (len(path) > 1 and path[-1] == b"/") or b"//" in path:
+    if (len(path) > 1 and path[-1] == "/") or "//" in path:
         raise InvalidPath(path)
 
     return path
@@ -94,11 +116,11 @@ def validate_watch_path(wpath):
     """Checks if a given watch path is valid -- it should either be a
     valid path or a special, starting with ``@`` character.
 
-    :param bytes wpath: watch path to check.
+    :param str wpath: watch path to check.
     :raises pyxs.exceptions.InvalidPath: when path fails to validate.
     """
-    if (wpath.startswith(b"@") and not
-        re.match(b"^@(?:introduceDomain|releaseDomain)\x00?$", wpath)):
+    if (wpath.startswith("@") and not
+        re.match("^@(?:introduceDomain|releaseDomain)\x00?$", wpath)):
         raise InvalidPath(wpath)
     else:
         validate_path(wpath)
@@ -115,24 +137,7 @@ def validate_perms(perms):
         when any of the permissions fail to validate.
     """
     for perm in perms:
-        if not re.match(b"[wrbn]\d+", perm):
+        if not re.match("[wrbn]\d+", perm):
             raise InvalidPermission(perm)
 
     return perms
-
-
-def force_bytes(value):
-    """Coerces a given value to :func:`bytes`.
-
-    >>> force_bytes(u"foo")
-    b'foo'
-    >>> force_bytes(None)
-    b'None'
-    """
-    if isinstance(value, bytes):
-        return value
-
-    if isinstance(value, unicode):
-        return value.encode("utf-8")
-    else:
-        return bytes(value)

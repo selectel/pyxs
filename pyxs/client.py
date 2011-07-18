@@ -18,7 +18,6 @@ __all__ = ["Client"]
 
 import copy
 import errno
-import operator
 import re
 from collections import deque
 
@@ -26,7 +25,7 @@ from ._internal import Event, Packet, Op
 from .connection import UnixSocketConnection, XenBusConnection
 from .exceptions import UnexpectedPacket, PyXSError
 from .helpers import validate_path, validate_watch_path, validate_perms, \
-    dict_merge, force_bytes, error
+    dict_merge, force_unicode, error
 
 
 class Client(object):
@@ -65,9 +64,9 @@ class Client(object):
             lambda p, *perms: validate_path(p) and validate_perms(perms)),
         dict.fromkeys([Op.GET_DOMAIN_PATH, Op.IS_DOMAIN_INTRODUCED,
                        Op.INTRODUCE, Op.RELEASE, Op.SET_TARGET],
-                      operator.methodcaller("isdigit")),
-        dict.fromkeys([Op.UNWATCH], validate_watch_path),
-        dict.fromkeys([Op.WATCH], lambda p, t: validate_watch_path(p))
+            lambda d: d[:-1].isdigit()),
+        dict.fromkeys([Op.WATCH, Op.UNWATCH],
+            lambda p, t: validate_path(p) and validate_watch_path(p))
     )
 
     #: A flag, which is ``True`` if we're operating on control domain
@@ -107,7 +106,7 @@ class Client(object):
     # ............
 
     def execute_command(self, op, *args, **kwargs):
-        args = [force_bytes(arg) + b"\x00" for arg in args]
+        args = [force_unicode(arg) + "\x00" for arg in args]
 
         if not self.COMMAND_VALIDATORS.get(op, lambda *args: True)(*args):
             raise ValueError(args)
@@ -115,7 +114,7 @@ class Client(object):
             raise ValueError(arg)
 
         kwargs["tx_id"] = self.tx_id  # Forcing ``tx_id`` here.
-        self.connection.send(Packet(op, b"".join(args), **kwargs))
+        self.connection.send(Packet(op, "".join(args), **kwargs))
 
         # If we have any watched paths `XenStore` will send watch events
         # mixed with replies to other operations, so we loop untill we
@@ -146,7 +145,7 @@ class Client(object):
         return packet.payload
 
     def ack(self, *args):
-        if self.execute_command(*args) != b"OK\x00":
+        if self.execute_command(*args) != "OK\x00":
             raise PyXSError("Ooops ...")
 
     # Public API.
@@ -199,7 +198,7 @@ class Client(object):
         :param str path: path to list.
         """
         payload = self.execute_command(Op.DIRECTORY, path)
-        return payload.split(b"\x00")[:-1]
+        return payload.split("\x00")[:-1]
 
     def get_perms(self, path):
         """Returns a list of permissions for a given `path`, see
@@ -209,7 +208,7 @@ class Client(object):
         :param str path: path to get permissions for.
         """
         payload = self.execute_command(Op.GET_PERMS, path)
-        return payload.split(b"\x00")[:-1]
+        return payload.split("\x00")[:-1]
 
     def set_perms(self, path, perms):
         """Sets a access permissions for a given `path`, see
@@ -257,7 +256,7 @@ class Client(object):
                 if packet.op is Op.WATCH_EVENT:
                     break
 
-        return Event(*packet.payload.split(b"\x00")[:-1])
+        return Event(*packet.payload.split("\x00")[:-1])
 
     def get_domain_path(self, domid):
         """Returns the domain's base path, as is used for relative
@@ -277,7 +276,7 @@ class Client(object):
         :param int domid: domain to check status for.
         """
         payload = self.execute_command(Op.IS_DOMAIN_INTRODUCED, domid)
-        return {b"T": True, b"F": False}[payload.rstrip(b"\x00")]
+        return {"T": True, "F": False}[payload.rstrip("\x00")]
 
     def introduce(self, domid, mfn, eventchn):
         """Tells ``xenstored`` to communicate with this domain.
@@ -341,8 +340,8 @@ class Client(object):
            Currently ``xenstored`` has a bug that after 2^32 transactions
            it will allocate id 0 for an actual transaction.
         """
-        payload = self.execute_command(Op.TRANSACTION_START, b"")
-        return int(payload.rstrip(b"\x00"))
+        payload = self.execute_command(Op.TRANSACTION_START, "")
+        return int(payload.rstrip("\x00"))
 
 
     def transaction_end(self, commit=True):
@@ -350,7 +349,7 @@ class Client(object):
         running no command is sent to XenStore.
         """
         if self.tx_id:
-            self.ack(Op.TRANSACTION_END, [b"F", b"T"][commit])
+            self.ack(Op.TRANSACTION_END, ["F", "T"][commit])
             self.tx_id = 0
 
     def transaction(self):

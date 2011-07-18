@@ -43,7 +43,7 @@ def test_validate_path():
     with pytest.raises(InvalidPath):
         validate_path("/foo/")
 
-    # d) no //'s!
+    # d) no //'s!.
     with pytest.raises(InvalidPath):
         validate_path("/foo//bar")
 
@@ -88,7 +88,7 @@ def test_validate_perms():
         validate_perms(["r-20"])
 
     try:
-        validate_perms(["w0", "r0", "b0", "n0"])
+        validate_perms("w0 r0 b0 n0".split())
         validate_perms(["w999999"])  # valid, even though it overflows int32.
     except InvalidPermission as p:
         pytest.fail("{0} is prefectly valid, baby :)".format(p.args))

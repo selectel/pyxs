@@ -14,36 +14,36 @@ from pyxs import Client, PyXSError
 def run(**kwargs):
     with Client(**kwargs) as c:
         # a) write-read.
-        c.write(b"/foo/bar", b"baz")
-        print(c.read(b"/foo/bar"))  # ==> "baz"
+        c.write("/foo/bar", "baz")
+        print(c.read("/foo/bar"))  # ==> "baz"
 
         # b) exceptions! let's try to read a non-existant path.
         try:
-            c.read(b"/path/to/something/useless")
+            c.read("/path/to/something/useless")
         except PyXSError as e:
             print(e)
 
         # c) okay, time to delete that /foo/bar path.
-        c.rm(b"/foo/bar")
+        c.rm("/foo/bar")
 
         try:
-            c.read(b"/foo/bar")
+            c.read("/foo/bar")
         except PyXSError as e:
             print("`/foo/bar` is no moar!")
 
         # d) directory listing and permissions.
-        c.mkdir(b"/foo/bar")
-        c.mkdir(b"/foo/baz")
-        c.mkdir(b"/foo/boo")
-        print("Here's what `/foo` has: ", c.directory(b"/foo"))
-        print(c.get_perms(b"/foo"))
+        c.mkdir("/foo/bar")
+        c.mkdir("/foo/baz")
+        c.mkdir("/foo/boo")
+        print("Here's what `/foo` has: ", c.directory("/foo"))
+        print(c.get_perms("/foo"))
 
         # e) let's watch some paths!
-        c.write(b"/foo/bar", b"baz")
-        c.watch(b"/foo/bar", "baz")
+        c.write("/foo/bar", "baz")
+        c.watch("/foo/bar", "baz")
         print("Watching ... do `$ xenstore-write /foo/bar <anything>`.")
         print(c.wait())
-        c.unwatch(b"/foo/bar", "baz")
+        c.unwatch("/foo/bar", "baz")
 
         # f) domain managment commands.
         print(c.get_domain_path(0))
