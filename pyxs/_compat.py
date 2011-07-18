@@ -16,6 +16,9 @@ from .exceptions import PyXSError as Error
 
 
 class xs(Client):
+    """XenStore client with a backward compatible interface, useful for
+    switching from ``xen.lowlevel.xs``.
+    """
 
     def close(self):
         self.connection.disconnect(silent=False)
