@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import errno
 import string
 
 import pytest
@@ -155,6 +156,7 @@ def test_client_context_manager():
 @virtualized
 def test_client_execute_command():
     c = Client()
+    c.execute_command(Op.WRITE, "/foo/bar", "baz")
 
     # a) arguments contain invalid characters.
     with pytest.raises(ValueError):
@@ -217,3 +219,69 @@ def test_client_execute_command():
         assert c.events[0] == Packet(Op.WATCH_EVENT, "boo")
 
     c.connection.recv = _old_recv
+
+    # Cleaning up.
+    with Client() as c:
+        c.execute_command(Op.RM, "/foo/bar")
+
+
+@virtualized
+def test_client_ack():
+    c = Client()
+
+    # a) OK-case.
+    c.connection.recv = lambda *args: Packet(Op.WRITE, "OK\x00")
+
+    try:
+        c.ack(Op.WRITE, "/foo", "bar")
+    except PyXSError as e:
+        pytest.fail("No error should've been raised, got: {0}"
+                    .format(e))
+
+    # b) ... something went wrong.
+    c.connection.recv = lambda *args: Packet(Op.WRITE, "boo")
+
+    with pytest.raises(PyXSError):
+        c.ack(Op.WRITE, "/foo", "bar")
+
+
+@virtualized
+def test_client_read():
+    for backend in [UnixSocketConnection, XenBusConnection]:
+        c = Client(connection=backend())
+
+        # a) non-existant path.
+        try:
+            c.read("/foo/bar")
+        except PyXSError as e:
+            assert e.args[0] is errno.ENOENT
+
+        # b) OK-case.
+        try:
+            assert c.read("/local/domain/0/domid") == "0"
+            assert c["/local/domain/0/domid"] == "0"
+        except PyXSError as e:
+            pytest.fail("No error should've been raised, got: {0}"
+                        .format(e))
+
+        # c) No read permissions (should be ran in DomU)?
+
+
+@virtualized
+def test_write():
+    for backend in [UnixSocketConnection, XenBusConnection]:
+        c = Client(connection=backend())
+
+        # a) OK-case.
+        try:
+            c.write("/foo/bar", "baz")
+            assert c.read("/foo/bar") == "baz"
+
+            c["/foo/bar"] = "boo"
+            assert c["/foo/bar"] == "boo"
+        except PyXSError as e:
+            assert e.args[0] is errno.ENOENT
+        finally:
+            c.rm("/foo/bar")
+
+        # b) No read permissions (should be ran in DomU)?

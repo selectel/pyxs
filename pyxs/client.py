@@ -142,10 +142,10 @@ class Client(object):
             else:
                 break
 
-        return packet.payload
+        return packet.payload.rstrip("\x00")
 
     def ack(self, *args):
-        if self.execute_command(*args) != "OK\x00":
+        if self.execute_command(*args) != "OK":
             raise PyXSError("Ooops ...")
 
     # Public API.
@@ -198,7 +198,7 @@ class Client(object):
         :param str path: path to list.
         """
         payload = self.execute_command(Op.DIRECTORY, path)
-        return payload.split("\x00")[:-1]
+        return payload.split("\x00")
 
     def get_perms(self, path):
         """Returns a list of permissions for a given `path`, see
@@ -208,7 +208,7 @@ class Client(object):
         :param str path: path to get permissions for.
         """
         payload = self.execute_command(Op.GET_PERMS, path)
-        return payload.split("\x00")[:-1]
+        return payload.split("\x00")
 
     def set_perms(self, path, perms):
         """Sets a access permissions for a given `path`, see
@@ -276,7 +276,7 @@ class Client(object):
         :param int domid: domain to check status for.
         """
         payload = self.execute_command(Op.IS_DOMAIN_INTRODUCED, domid)
-        return {"T": True, "F": False}[payload.rstrip("\x00")]
+        return {"T": True, "F": False}[payload]
 
     def introduce(self, domid, mfn, eventchn):
         """Tells ``xenstored`` to communicate with this domain.
@@ -341,7 +341,7 @@ class Client(object):
            it will allocate id 0 for an actual transaction.
         """
         payload = self.execute_command(Op.TRANSACTION_START, "")
-        return int(payload.rstrip("\x00"))
+        return int(payload)
 
 
     def transaction_end(self, commit=True):
