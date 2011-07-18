@@ -58,7 +58,7 @@ class Client(object):
     """
     COMMAND_VALIDATORS = dict_merge(
         dict.fromkeys([Op.READ, Op.MKDIR, Op.RM, Op.DIRECTORY, Op.GET_PERMS],
-                       validate_path),
+                      validate_path),
         dict.fromkeys([Op.WRITE], lambda p, v: validate_path(p)),
         dict.fromkeys([Op.SET_PERMS],
             lambda p, *perms: validate_path(p) and validate_perms(perms)),
