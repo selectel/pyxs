@@ -4,6 +4,8 @@
     ~~
 
     ``xenstore-ls`` implementation with :mod:`pyxs`.
+
+    :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
 """
 
 from __future__ import print_function, unicode_literals

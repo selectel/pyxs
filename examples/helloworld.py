@@ -4,6 +4,8 @@
     ~~~~~~~~~~
 
     A minimal working example, showing :mod:`pyxs` API usage.
+
+    :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
 """
 
 from __future__ import unicode_literals, print_function
