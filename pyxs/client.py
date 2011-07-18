@@ -111,7 +111,7 @@ class Client(object):
         if not self.COMMAND_VALIDATORS.get(op, lambda *args: True)(*args):
             raise ValueError(args)
         elif not all(re.match("^[\x00\x20-\x7f]+$", arg) for arg in args):
-            raise ValueError(arg)
+            raise ValueError(args)
 
         kwargs["tx_id"] = self.tx_id  # Forcing ``tx_id`` here.
         self.connection.send(Packet(op, "".join(args), **kwargs))
@@ -192,7 +192,7 @@ class Client(object):
 
     __delitem__ = rm
 
-    def directory(self, path):
+    def ls(self, path):
         """Returns a list of names of the immediate children of `path`.
 
         :param str path: path to list.
@@ -200,7 +200,7 @@ class Client(object):
         payload = self.execute_command(Op.DIRECTORY, path)
         return payload.split("\x00")
 
-    def get_perms(self, path):
+    def get_permissions(self, path):
         """Returns a list of permissions for a given `path`, see
         :exc:`~pyxs.exceptions.InvalidPermission` for details on
         permission format.
@@ -210,7 +210,7 @@ class Client(object):
         payload = self.execute_command(Op.GET_PERMS, path)
         return payload.split("\x00")
 
-    def set_perms(self, path, perms):
+    def set_permissions(self, path, perms):
         """Sets a access permissions for a given `path`, see
         :exc:`~pyxs.exceptions.InvalidPermission` for details on
         permission format.
@@ -278,19 +278,19 @@ class Client(object):
         payload = self.execute_command(Op.IS_DOMAIN_INTRODUCED, domid)
         return {"T": True, "F": False}[payload]
 
-    def introduce(self, domid, mfn, eventchn):
+    def introduce_domain(self, domid, mfn, eventchn):
         """Tells ``xenstored`` to communicate with this domain.
 
         :param int domid: a real domain id, (``0`` is forbidden).
         :param long mfn: address of xenstore page in `domid`.
-        :param int eventch: an unbound event chanel in `domid`.
+        :param int eventchn: an unbound event chanel in `domid`.
         """
         if not domid:
             raise ValueError("Dom0 cannot be introduced.")
 
         self.ack(Op.INTRODUCE, domid, mfn, eventchn)
 
-    def release(self, domid):
+    def release_domain(self, domid):
         """Manually requests ``xenstored`` to disconnect from the
         domain.
 
@@ -299,19 +299,19 @@ class Client(object):
         .. note:: ``xenstored`` will in any case detect domain
                   destruction and disconnect by itself.
         """
-        if not self.su:
+        if not self.SU:
             raise error(errno.EPERM)
 
         self.ack(Op.RELEASE, domid)
 
-    def resume(self, domid):
+    def resume_domain(self, domid):
         """Tells ``xenstored`` to clear its shutdown flag for a
         domain. This ensures that a subsequent shutdown will fire the
         appropriate watches.
 
         :param int domid: domain to resume.
         """
-        if not self.su:
+        if not self.SU:
             raise error(errno.EPERM)
 
         self.ack(Op.RESUME, domid)
@@ -326,7 +326,7 @@ class Client(object):
         :param int domid: domain to set target for.
         :param int target: target domain (yours truly, Captain).
         """
-        if not self.su:
+        if not self.SU:
             raise error(errno.EPERM)
 
         self.ack(Op.SET_TARGET, domid, target)
@@ -342,7 +342,6 @@ class Client(object):
         """
         payload = self.execute_command(Op.TRANSACTION_START, "")
         return int(payload)
-
 
     def transaction_end(self, commit=True):
         """End a transaction currently in progress; if no transaction is

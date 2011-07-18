@@ -37,8 +37,8 @@ def run(**kwargs):
         c.mkdir("/foo/bar")
         c.mkdir("/foo/baz")
         c.mkdir("/foo/boo")
-        print("Here's what `/foo` has: ", c.directory("/foo"))
-        print(c.get_perms("/foo"))
+        print("Here's what `/foo` has: ", c.ls("/foo"))
+        print(c.get_permissions("/foo"))
 
         # e) let's watch some paths!
         c.write("/foo/bar", "baz")

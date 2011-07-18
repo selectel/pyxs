@@ -291,7 +291,7 @@ def test_mkdir():
         c = Client(connection=backend())
 
         c.mkdir("/foo/bar")
-        assert c.directory("/foo") == ["bar"]
+        assert c.ls("/foo") == ["bar"]
 
         # FIXME: hangs for ``XenBusConnection``!
         if backend is not XenBusConnection:
@@ -325,15 +325,15 @@ def test_directory():
         c.mkdir("/foo/bar")
 
         # a) OK-case.
-        assert c.directory("/foo") == ["bar"]
+        assert c.ls("/foo") == ["bar"]
 
         # FIXME: hangs for ``XenBusConnection``!
         if backend is not XenBusConnection:
-            assert c.directory("/foo/bar") == [""]
+            assert c.ls("/foo/bar") == [""]
 
         # b) directory doesn't exist.
         try:
-            c.directory("/path/to/something")
+            c.ls("/path/to/something")
         except PyXSError as e:
             assert e.args[0] is errno.ENOENT
 

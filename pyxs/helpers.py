@@ -33,8 +33,8 @@ _codeerror = dict((message, code)
 def writeall(fd, data):
     """Writes a data string to the file descriptor.
 
-    Calls :func:`os.write` repeatidly, unless all data is written.
-    If an error occurs, it's imposible to tell how much data has
+    Calls :func:`os.write` repeatedly, unless all data is written.
+    If an error occurs, it's impossible to tell how much data has
     been written.
     """
     length = len(data)
@@ -130,7 +130,7 @@ def validate_watch_path(wpath):
 
 def validate_perms(perms):
     """Checks if a given list of permision follows the format described
-    in :meth:`~pyxs.client.Client.get_perms`.
+    in :meth:`~pyxs.client.Client.get_permissions`.
 
     :param list perms: permissions to check.
     :raises pyxs.exceptions.InvalidPermissions:

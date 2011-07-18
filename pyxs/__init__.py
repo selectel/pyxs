@@ -34,3 +34,4 @@
 from .client import Client
 from .exceptions import PyXSError, ConnectionError, UnexpectedPacket, \
     InvalidOperation, InvalidPath, InvalidPayload
+from ._compat import xs, Error

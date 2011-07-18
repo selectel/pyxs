@@ -28,7 +28,7 @@ def traverse(c, node, prefix=()):
     if path != node:                    # Don't print the root node.
         print("{0}{1} = {2!r}".format(" " * depth, node, c.read(path)))
 
-    for child in c.directory(path):     # Repeat everything for each child.
+    for child in c.ls(path):     # Repeat everything for each child.
         traverse(c, child, prefix)
 
 

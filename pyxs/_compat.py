@@ -16,19 +16,26 @@ from .exceptions import PyXSError as Error
 
 
 class xs(Client):
+
     def close(self):
         self.connection.disconnect(silent=False)
 
+    def execute_command(self, op, *args, **kwargs):
+        try:
+            return super(xs, self).execute_command(op, *args, **kwargs)
+        except ValueError as e:
+            raise Error(e)
+
     def get_permissions(self, tx_id, path):
         self.tx_id = int(tx_id)
-        super(Client, self).get_perms(path)
+        super(Client, self).get_permissions(path)
 
     def set_permissions(self, tx_id, path, perms):
         self.tx_id = int(tx_id)
-        super(Client, self).set_perms(path, perms)
+        super(Client, self).set_permissions(path, perms)
 
     def ls(self, path):
-        return super(Client, self).directory(path) or None
+        return super(Client, self).ls(path) or None
 
     def rm(self, tx_id, path):
         self.tx_id = int(tx_id)
@@ -44,17 +51,14 @@ class xs(Client):
 
     def introduce_domain(self, *args):
         try:
-            super(Client, self).introduce(*args)
+            super(Client, self).introduce_domain(*args)
         except ValueError as e:
-            raise PyXSError(e)
-
-    release_domain = Client.release
-    resume_domain = Client.resume
+            raise Error(e)
 
     def transaction_end(self, abort=0):
         try:
             super(Client, self).transaction_end(commit=not abort)
-        except PyXSError as e:
+        except Error as e:
             if len(e.args) is 1:
                 return False
             raise

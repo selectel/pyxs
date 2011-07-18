@@ -37,7 +37,7 @@ class FileDescriptorConnection(object):
     fd = path = None
 
     def __init__(self):
-        raise NotImplemented("__init__() should be overriden by subclasses.")
+        raise NotImplemented("__init__() should be overridden by subclasses.")
 
     def disconnect(self, silent=True):
         """Disconnects from XenStore.
@@ -77,7 +77,7 @@ class FileDescriptorConnection(object):
                                   .format(self.path, e.args))
 
     def recv(self):
-        """Recieves a packet from XenStore."""
+        """Receives a packet from XenStore."""
         try:
             data = os.read(self.fd, Packet._struct.size)
         except OSError as e:
@@ -110,7 +110,7 @@ class UnixSocketConnection(FileDescriptorConnection):
             )
 
         self.path = path
-        self.socket_timeout = None
+        self.socket_timeout = socket_timeout
 
     def __copy__(self):
         return self.__class__(self.path, self.socket_timeout)
@@ -140,7 +140,7 @@ class XenBusConnection(FileDescriptorConnection):
     def __init__(self, path=None):
         if path is None:
             # .. note:: it looks like OCaml-powered ``xenstored``
-            # simply ignores the posibility of being launched on a
+            # simply ignores the possibility of being launched on a
             # platform, different from Linux, but ``libxs``  has those
             # constants in-place.
             system = platform.system()
