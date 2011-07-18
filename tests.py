@@ -129,7 +129,7 @@ def test_client_init():
     assert c.connection.fd is None
 
 
-virtualized = pytest.mark.skipif("not os.path.exists('/proc/xen')")
+virtualized = pytest.mark.skipif("not os.path.exists('/proc/xen') or not Client.SU")
 
 @virtualized
 def test_client_transaction():
