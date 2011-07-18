@@ -6,13 +6,13 @@ Here you can see the full list of changes between each pyxs release_domain.
 Version 0.2
 -----------
 
-- Completely refactored validation -- no more @spec magic, everything
-  is checked implicitly inside `Client.execute_command()`.
+- Completely refactored validation -- no more `@spec` magic, everything
+  is checked explicitly inside `Client.execute_command()`.
 - Added a compatibility interface, which mimics `xen.lowlevel.xs`
-  behaviour, using `pyxs` as a backend.
+  behaviour, using `pyxs` as a backend, see pyxs/_compat.py.
 - Restricted `SET_TARGET`, `INTRODUCE` and `RELEASE` operations to
   Dom0 only -- `/proc/xen/capabilities` is used to check domain
-  status.
+  role.
 - Fixed a bug in `Client.wait()` -- queued watch events weren't wrapped
   in `pyxs._internal.Event` class, unlike the received ones.
 
