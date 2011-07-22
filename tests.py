@@ -34,6 +34,9 @@ def test_packet():
     with pytest.raises(InvalidPayload):
         Packet(Op.DEBUG, "hello" * 4096, 0)
 
+    # c) TEST ME!
+    Packet(op=11, rq_id=0, tx_id=128)
+
 
 # Helpers.
 

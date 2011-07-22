@@ -83,8 +83,6 @@ def force_unicode(value):
     """
     if isinstance(value, bytes):
         return value.decode("utf-8")
-    elif hasattr(value, "__iter__"):
-        list(map(force_unicode, value))
     else:
         return str(value)
 
