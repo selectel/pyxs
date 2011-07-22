@@ -70,7 +70,9 @@ class FileDescriptorConnection(object):
         try:
             writeall(self.fd, str(packet).encode("utf-8"))
         except OSError as e:
-            if e.args[0] is errno.EPIPE:
+            if e.args[0] in [errno.ECONNRESET,
+                             errno.ECONNABORTED,
+                             errno.EPIPE]:
                 self.disconnect()
 
             raise ConnectionError("Error while writing to {0!r}: {1}"
@@ -81,7 +83,9 @@ class FileDescriptorConnection(object):
         try:
             data = os.read(self.fd, Packet._struct.size)
         except OSError as e:
-            if e.args[0] is errno.EPIPE:
+            if e.args[0] in [errno.ECONNRESET,
+                             errno.ECONNABORTED,
+                             errno.EPIPE]:
                 self.disconnect()
 
             raise ConnectionError("Error while reading from {0!r}: {1}"
