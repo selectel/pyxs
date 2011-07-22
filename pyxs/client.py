@@ -64,7 +64,7 @@ class Client(object):
             lambda p, *perms: validate_path(p) and validate_perms(perms)),
         dict.fromkeys([Op.GET_DOMAIN_PATH, Op.IS_DOMAIN_INTRODUCED,
                        Op.INTRODUCE, Op.RELEASE, Op.SET_TARGET],
-            lambda d: d[:-1].isdigit()),
+            lambda *domids: all(d[:-1].isdigit() for d in domids)),
         dict.fromkeys([Op.WATCH, Op.UNWATCH],
             lambda p, t: validate_path(p) and validate_watch_path(p))
     )
