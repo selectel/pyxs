@@ -2,6 +2,7 @@
 
 import errno
 import string
+import sys
 
 import pytest
 
@@ -330,3 +331,53 @@ def test_ls():
             assert e.args[0] is errno.ENOENT
 
         # c) No list permissions (should be ran in DomU)?
+
+
+@virtualized
+def test_permissions():
+    for backend in [UnixSocketConnection, XenBusConnection]:
+        c = Client(connection=backend())
+        c.rm("/foo")
+        c.mkdir("/foo/bar")
+
+        # a) checking default permissions -- full access.
+        assert c.get_permissions("/foo/bar") == ["n0"]
+
+        # b) setting new permissions, and making sure it worked.
+        c.set_permissions("/foo/bar", ["b0"])
+        assert c.get_permissions("/foo/bar") == ["b0"]
+
+        # c) conflicting permissions -- XenStore doesn't care.
+        c.set_permissions("/foo/bar", ["b0", "n0", "r0"])
+        assert c.get_permissions("/foo/bar") == ["b0", "n0", "r0"]
+
+        # d) invalid permission format.
+        with pytest.raises(InvalidPermission):
+            c.set_permissions("/foo/bar", ["x0"])
+
+
+@virtualized
+def test_get_domain_path():
+    for backend in [UnixSocketConnection, XenBusConnection]:
+        c = Client(connection=backend())
+
+        # a) invalid domid.
+        with pytest.raises(ValueError):
+            c.get_domain_path("foo")
+
+        # b) OK-case (note, that XenStored doesn't care if a domain
+        #    actually exists, but according to the spec we shouldn't
+        #    really count on a *valid* reply in that case).
+        assert c.get_domain_path(0) == "/local/domain/0"
+        assert c.get_domain_path(999) == "/local/domain/999"
+
+
+@virtualized
+def test_is_domain_introduced():
+    for backend in [UnixSocketConnection, XenBusConnection]:
+        c = Client(connection=backend())
+
+        for domid in map(int, c.ls("/local/domain")):
+           assert c.is_domain_introduced(domid)
+
+        assert not c.is_domain_introduced(999)
