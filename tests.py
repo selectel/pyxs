@@ -264,9 +264,9 @@ def test_client_read():
         except PyXSError as e:
             assert e.args[0] is errno.ENOENT
 
-        # b) OK-case.
-        assert c.read("/local/domain/0/domid") == "0"
-        assert c["/local/domain/0/domid"] == "0"
+        # b) OK-case (`/local` is allways in place).
+        assert c.read("/local") == ""
+        assert c["/local"] == ""
 
         # c) No read permissions (should be ran in DomU)?
 
@@ -292,10 +292,7 @@ def test_mkdir():
 
         c.mkdir("/foo/bar")
         assert c.ls("/foo") == ["bar"]
-
-        # FIXME: hangs for ``XenBusConnection``!
-        if backend is not XenBusConnection:
-            assert c.read("/foo/bar") == ""
+        assert c.read("/foo/bar") == ""
 
 
 @virtualized
@@ -313,9 +310,7 @@ def test_rm():
         with pytest.raises(PyXSError):
             c.read("/foo/bar")
 
-        # FIXME: hangs for ``XenBusConnection``!
-        if backend is not XenBusConnection:
-            assert c.read("/foo") == ""
+        assert c.read("/foo") == ""
 
 
 @virtualized
@@ -326,10 +321,7 @@ def test_directory():
 
         # a) OK-case.
         assert c.ls("/foo") == ["bar"]
-
-        # FIXME: hangs for ``XenBusConnection``!
-        if backend is not XenBusConnection:
-            assert c.ls("/foo/bar") == [""]
+        assert c.ls("/foo/bar") == [""]
 
         # b) directory doesn't exist.
         try:

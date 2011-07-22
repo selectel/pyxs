@@ -81,7 +81,7 @@ class FileDescriptorConnection(object):
     def recv(self):
         """Receives a packet from XenStore."""
         try:
-            data = os.read(self.fd, Packet._struct.size)
+            header = os.read(self.fd, Packet._struct.size)
         except OSError as e:
             if e.args[0] in [errno.ECONNRESET,
                              errno.ECONNABORTED,
@@ -91,9 +91,15 @@ class FileDescriptorConnection(object):
             raise ConnectionError("Error while reading from {0!r}: {1}"
                                   .format(self.path, e.args))
         else:
-            op, rq_id, tx_id, size = Packet._struct.unpack(data)
-            return Packet(op, os.read(self.fd, size).decode("utf-8"),
-                          rq_id, tx_id)
+            op, rq_id, tx_id, size = Packet._struct.unpack(header)
+
+            # XXX XenBus seems to handle ``os.read(fd, 0)`` incorrectly,
+            # blocking unless any new data appears, so we have to check
+            # size value, before reading.
+            payload = ("" if size is 0 else
+                       os.read(self.fd, size).decode("utf-8"))
+
+            return Packet(op, payload, rq_id, tx_id)
 
 
 class UnixSocketConnection(FileDescriptorConnection):
@@ -132,7 +138,6 @@ class UnixSocketConnection(FileDescriptorConnection):
                                   .format(self.path, e.args))
         else:
             self.fd = os.dup(sock.fileno())
-
 
 class XenBusConnection(FileDescriptorConnection):
     """XenStore connection through XenBus.
