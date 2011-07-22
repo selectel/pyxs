@@ -314,14 +314,14 @@ def test_rm():
 
 
 @virtualized
-def test_directory():
+def test_ls():
     for backend in [UnixSocketConnection, XenBusConnection]:
         c = Client(connection=backend())
         c.mkdir("/foo/bar")
 
         # a) OK-case.
         assert c.ls("/foo") == ["bar"]
-        assert c.ls("/foo/bar") == [""]
+        assert c.ls("/foo/bar") == []
 
         # b) directory doesn't exist.
         try:

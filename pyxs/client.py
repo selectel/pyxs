@@ -198,7 +198,7 @@ class Client(object):
         :param str path: path to list.
         """
         payload = self.execute_command(Op.DIRECTORY, path)
-        return payload.split("\x00")
+        return [] if payload is "" else payload.split("\x00")
 
     def get_permissions(self, path):
         """Returns a list of permissions for a given `path`, see
