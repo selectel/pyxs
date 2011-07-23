@@ -67,8 +67,12 @@ class FileDescriptorConnection(object):
         if not self.fd:
             self.connect()
 
+        # Note the ``[:-1]`` slice -- the actual payload is excluded.
+        data = (packet._struct.pack(*packet[:-1]) +
+                packet.payload.encode("utf-8"))
+
         try:
-            writeall(self.fd, str(packet).encode("utf-8"))
+            writeall(self.fd, data)
         except OSError as e:
             if e.args[0] in [errno.ECONNRESET,
                              errno.ECONNABORTED,

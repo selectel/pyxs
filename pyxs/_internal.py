@@ -75,8 +75,3 @@ class Packet(namedtuple("_Packet", "op rq_id tx_id size payload")):
 
         return super(Packet, cls).__new__(cls,
             op, rq_id or 0, tx_id or 0, len(payload), payload)
-
-    def __str__(self):
-        # Note the ``[:-1]`` slice -- the actual payload is excluded.
-        return (self._struct.pack(*self[:-1]).decode("utf-8") +
-                self.payload)

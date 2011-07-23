@@ -34,9 +34,6 @@ def test_packet():
     with pytest.raises(InvalidPayload):
         Packet(Op.DEBUG, "hello" * 4096, 0)
 
-    # c) TEST ME!
-    Packet(op=11, rq_id=0, tx_id=128)
-
 
 # Helpers.
 
@@ -406,3 +403,19 @@ def test_watches():
         #    event as well.
         Timer(.5, lambda: c.write("/foo/bar/baz", "???")).run()
         assert c.wait() == ("/foo/bar/baz", "boo")
+
+
+@virtualized
+def test_header_decode_error():
+    for backend in [UnixSocketConnection, XenBusConnection]:
+        c = Client(connection=backend())
+
+        # a) The following packet's header cannot be decoded to UTF-8, but
+        #    we still need to handle it somehow.
+        p = Packet(11, "/foo", rq_id=0, tx_id=128)
+
+        try:
+            c.connection.send(p)
+        except UnicodeDecodeError as e:
+            pytest.fail("No error should've been raised, got: {0}"
+                        .format(e))
