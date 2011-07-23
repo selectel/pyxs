@@ -42,6 +42,20 @@ def writeall(fd, data):
         length -= os.write(fd, data[-length:])
 
 
+def readall(fd, length):
+    """Reads a data string of a given length from the file descriptor.
+
+    Calls :func:`os.read` repeatedly, unless all data is read. If an
+    error occurs, it's impossible to tell how much data has been read.
+    """
+    chunks = []
+    while length:
+        chunks.append(os.read(fd, length))
+        length -= len(chunks[-1])
+    else:
+        return b"".join(chunks)
+
+
 def dict_merge(*dicts):
     """Merges given dicts to a single one.
 

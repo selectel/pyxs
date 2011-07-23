@@ -23,7 +23,7 @@ if sys.version_info[0] is not 3:
     bytes, str = str, unicode
 
 from .exceptions import ConnectionError
-from .helpers import writeall
+from .helpers import writeall, readall
 from ._internal import Packet
 
 
@@ -85,7 +85,7 @@ class FileDescriptorConnection(object):
     def recv(self):
         """Receives a packet from XenStore."""
         try:
-            header = os.read(self.fd, Packet._struct.size)
+            header = readall(self.fd, Packet._struct.size)
         except OSError as e:
             if e.args[0] in [errno.ECONNRESET,
                              errno.ECONNABORTED,
