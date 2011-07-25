@@ -84,6 +84,9 @@ class FileDescriptorConnection(object):
 
     def recv(self):
         """Receives a packet from XenStore."""
+        if not self.fd:
+            self.connect()
+
         try:
             header = readall(self.fd, Packet._struct.size)
         except OSError as e:
