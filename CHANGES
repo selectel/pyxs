@@ -1,10 +1,12 @@
 pyxs Changelog
 ==============
 
-Here you can see the full list of changes between each pyxs release_domain.
+Here you can see the full list of changes between each pyxs release.
 
 Version 0.2
 -----------
+
+Released on August 18th 2011
 
 - Completely refactored validation -- no more `@spec` magic, everything
   is checked explicitly inside `Client.execute_command()`.
@@ -21,7 +23,7 @@ Version 0.2
 Version 0.1
 -------------
 
-Initial release, released on July 16th
+Initial release, released on July 16th 2011
 
 - Added a complete implementation of XenStore protocol, including
   transactions and path watching, see `pyxs.Client` for details.
