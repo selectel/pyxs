@@ -19,6 +19,7 @@ __all__ = ["Client"]
 import copy
 import errno
 import re
+import posixpath
 from collections import deque
 
 from ._internal import Event, Packet, Op
@@ -257,6 +258,33 @@ class Client(object):
                     break
 
         return Event(*packet.payload.split("\x00")[:-1])
+
+    def walk(self, top, topdown=True):
+        """Walk XenStore, yielding 3-tuples ``(path, value, children)``
+        for each node in the tree, rooted at node `top`.
+
+        :param str top: node to start from.
+        :param bool topdown: see :func:`os.walk` for details.
+        """
+        try:
+            children = self.ls(top)
+        except PyXSError:
+            return
+
+        try:
+            value = self.read(top)
+        except PyXSError:
+            value = ""  # '/' or no read permissions?
+
+        if topdown:
+            yield top, value, children
+
+        for child in children:
+            for x in self.walk(posixpath.join(top, child)):
+                yield x
+
+        if not topdown:
+            yield top, value, children
 
     def get_domain_path(self, domid):
         """Returns the domain's base path, as is used for relative

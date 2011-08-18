@@ -15,6 +15,8 @@ Version 0.2
   role.
 - Fixed a bug in `Client.wait()` -- queued watch events weren't wrapped
   in `pyxs._internal.Event` class, unlike the received ones.
+- Added `Client.walk()` method for walking XenStore tree -- similar to
+  `os.walk()`
 
 Version 0.1
 -------------
