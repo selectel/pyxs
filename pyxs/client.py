@@ -14,170 +14,40 @@
 
 from __future__ import absolute_import, unicode_literals
 
-__all__ = ["Client", "UnixSocketConnection", "XenBusConnection"]
+__all__ = ["Client"]
 
 import copy
 import errno
-import os
-import platform
-import socket
+import re
+import posixpath
 from collections import deque
 
 from ._internal import Event, Packet, Op
-from .exceptions import ConnectionError, UnexpectedPacket, PyXSError
-from .helpers import spec
-
-
-#: A reverse mapping for :data:`errno.errorcode`.
-_codeerror = dict((message, code)
-                  for code, message in errno.errorcode.iteritems())
-
-
-class FileDescriptorConnection(object):
-    """Abstract XenStore connection, using an fd for I/O operations.
-
-    Subclasses are expected to define :meth:`connect()` and set
-    :attr:`fd` and :attr:`path` attributes, where `path` is a human
-    readable path to the object, `fd` points to.
-    """
-    fd = path = None
-
-    def __init__(self):
-        raise NotImplemented("__init__() should be overriden by subclasses.")
-
-    def disconnect(self):
-        if self.fd is None:
-            return
-
-        try:
-            os.close(self.fd)
-        except OSError:
-            pass
-        finally:
-            self.fd = None
-
-    def send(self, packet):
-        if not self.fd:
-            self.connect()
-
-        try:
-            return os.write(self.fd, str(packet))
-        except OSError as e:
-            if e.args[0] is errno.EPIPE:
-                self.disconnect()
-
-            raise ConnectionError("Error while writing to {0!r}: {1}"
-                                  .format(self.path, e.args))
-
-    def recv(self):
-        try:
-            data = os.read(self.fd, Packet._struct.size)
-        except OSError as e:
-            if e.args[0] is errno.EPIPE:
-                self.disconnect()
-
-            raise ConnectionError("Error while reading from {0!r}: {1}"
-                                  .format(self.path, e.args))
-        else:
-            op, rq_id, tx_id, size = Packet._struct.unpack(data)
-            return Packet(op, os.read(self.fd, size), rq_id, tx_id)
-
-
-class UnixSocketConnection(FileDescriptorConnection):
-    """XenStore connection through Unix domain socket.
-
-    :param str path: path to XenStore unix domain socket, if not
-                     provided explicitly is restored from process
-                     environment -- similar to what ``libxs`` does.
-    :param float socket_timeout: see :func:`socket.settimeout` for
-                                 details.
-    """
-    def __init__(self, path=None, socket_timeout=None):
-        if path is None:
-            path = (
-                os.getenv("XENSTORED_PATH") or
-                os.path.join(os.getenv("XENSTORED_RUNDIR",
-                                       "/var/run/xenstored"), "socket")
-            )
-
-        self.path = path
-        self.socket_timeout = None
-
-    def __copy__(self):
-        return self.__class__(self.path, self.socket_timeout)
-
-    def connect(self):
-        if self.fd:
-            return
-
-        try:
-            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sock.settimeout(self.socket_timeout)
-            sock.connect(self.path)
-        except socket.error as e:
-            raise ConnectionError("Error connecting to {0!r}: {1}"
-                                  .format(self.path, e.args))
-        else:
-            self.fd = os.dup(sock.fileno())
-
-
-class XenBusConnection(FileDescriptorConnection):
-    """XenStore connection through XenBus.
-
-    :param str path: path to XenBus block device; a predefined
-                     OS-specific constant is used, if a value isn't
-                     provided explicitly.
-    """
-    def __init__(self, path=None):
-        if path is None:
-            # .. note:: it looks like OCaml-powered ``xenstored``
-            # simply ignores the posibility of being launched on a
-            # platform, different from Linux, but ``libxs``  has those
-            # constants in-place.
-            system = platform.system()
-
-            if system == "Linux":
-                path = "/proc/xen/xenbus"
-            elif system == "NetBSD":
-                path = "/kern/xen/xenbus"
-            else:
-                path = "/dev/xen/xenbus"
-
-        self.path = path
-
-    def __copy__(self):
-        return self.__class__(self.path)
-
-    def connect(self):
-        if self.fd:
-            return
-
-        try:
-            self.fd = os.open(self.path, os.O_RDWR)
-        except OSError as e:
-            raise ConnectionError("Error while opening {0!r}: {1}"
-                                  .format(self.path, e.args))
+from .connection import UnixSocketConnection, XenBusConnection
+from .exceptions import UnexpectedPacket, PyXSError
+from .helpers import validate_path, validate_watch_path, validate_perms, \
+    dict_merge, force_unicode, error
 
 
 class Client(object):
     """XenStore client -- <useful comment>.
 
     :param str xen_bus_path: path to XenBus device, implies that
-                             :class:`XenBusConnection` is used as a
-                             backend.
+                             :class:`~pyxs.connectionXenBusConnection`
+                             is used as a backend.
     :param str unix_socket_path: path to XenStore Unix domain socket,
-                                 usually something like
-                                 ``/var/run/xenstored/socket`` -- implies
-                                 that :class:`UnixSocketConnection` is
-                                 used as a backend.
+        usually something like ``/var/run/xenstored/socket`` -- implies
+        that :class:`~pyxs.connection.UnixSocketConnection` is used
+        as a backend.
     :param float socket_timeout: see :func:`socket.settimeout` for
                                  details.
     :param bool transaction: if ``True`` :meth:`transaction_start` will
                              be issued right after connection is
                              established.
 
-    .. note:: :class:`UnixSocketConnection` is used as a fallback value,
-              if backend cannot be determined from arguments given.
+    .. note:: :class:`~pyxs.connection.UnixSocketConnection` is used
+              as a fallback value, if backend cannot be determined
+              from arguments given.
 
     Here's a quick example:
 
@@ -187,6 +57,26 @@ class Client(object):
     'OK'
     'baz'
     """
+    COMMAND_VALIDATORS = dict_merge(
+        dict.fromkeys([Op.READ, Op.MKDIR, Op.RM, Op.DIRECTORY, Op.GET_PERMS],
+                      validate_path),
+        dict.fromkeys([Op.WRITE], lambda p, v: validate_path(p)),
+        dict.fromkeys([Op.SET_PERMS],
+            lambda p, *perms: validate_path(p) and validate_perms(perms)),
+        dict.fromkeys([Op.GET_DOMAIN_PATH, Op.IS_DOMAIN_INTRODUCED,
+                       Op.INTRODUCE, Op.RELEASE, Op.SET_TARGET],
+            lambda *domids: all(d[:-1].isdigit() for d in domids)),
+        dict.fromkeys([Op.WATCH, Op.UNWATCH],
+            lambda p, t: validate_path(p) and validate_watch_path(p))
+    )
+
+    #: A flag, which is ``True`` if we're operating on control domain
+    #: and else otherwise.
+    try:
+        SU = open("/proc/xen/capabilities").read() == "control_d\n"
+    except (IOError, OSError):
+        SU = False
+
     def __init__(self, unix_socket_path=None, socket_timeout=None,
                  xen_bus_path=None, connection=None, transaction=None):
         if connection:
@@ -216,7 +106,14 @@ class Client(object):
     # Private API.
     # ............
 
-    def communicate(self, op, *args, **kwargs):
+    def execute_command(self, op, *args, **kwargs):
+        args = [force_unicode(arg) + "\x00" for arg in args]
+
+        if not self.COMMAND_VALIDATORS.get(op, lambda *args: True)(*args):
+            raise ValueError(args)
+        elif not all(re.match("^[\x00\x20-\x7f]+$", arg) for arg in args):
+            raise ValueError(args)
+
         kwargs["tx_id"] = self.tx_id  # Forcing ``tx_id`` here.
         self.connection.send(Packet(op, "".join(args), **kwargs))
 
@@ -229,8 +126,7 @@ class Client(object):
             # According to ``xenstore.txt`` erroneous responses start with
             # a capital E and end with ``NULL``-byte.
             if packet.op is Op.ERROR:
-                error = _codeerror.get(packet.payload[:-1], 0)
-                raise PyXSError(error, os.strerror(error))
+                raise error(packet.payload[:-1])
             # Incoming packet should either be a watch event or have the
             # same operation type as the packet sent.
             elif packet.op is Op.WATCH_EVENT:
@@ -247,27 +143,24 @@ class Client(object):
             else:
                 break
 
-        return packet
-
-    def command(self, *args):
-        return self.communicate(*args).payload
+        return packet.payload.rstrip("\x00")
 
     def ack(self, *args):
-        if self.command(*args) != "OK\x00":
+        if self.execute_command(*args) != "OK":
             raise PyXSError("Ooops ...")
 
     # Public API.
     # ...........
 
-    @spec("<path>|")
     def read(self, path):
         """Reads data from a given path.
 
         :param str path: a path to read from.
         """
-        return self.command(Op.READ, path)
+        return self.execute_command(Op.READ, path)
 
-    @spec("<path>|", "<value|>")
+    __getitem__ = read
+
     def write(self, path, value):
         """Writes data to a given path.
 
@@ -277,7 +170,8 @@ class Client(object):
         """
         self.ack(Op.WRITE, path, value)
 
-    @spec("<path>|")
+    __setitem__ = write
+
     def mkdir(self, path):
         """Ensures that a given path exists, by creating it and any
         missing parents with empty values. If `path` or any parent
@@ -287,7 +181,6 @@ class Client(object):
         """
         self.ack(Op.MKDIR, path)
 
-    @spec("<path>|")
     def rm(self, path):
         """Ensures that a given does not exist, by deleting it and all
         of its children. It is not an error if `path` doesn't exist, but
@@ -298,28 +191,27 @@ class Client(object):
         """
         self.ack(Op.RM, path)
 
-    @spec("<path>|")
-    def directory(self, path):
+    __delitem__ = rm
+
+    def ls(self, path):
         """Returns a list of names of the immediate children of `path`.
-        The resulting children are each named as
-        ``<path>/<child-leaf-name>``.
 
         :param str path: path to list.
         """
-        return self.command(Op.DIRECTORY, path).rstrip("\x00").split("\x00")
+        payload = self.execute_command(Op.DIRECTORY, path)
+        return [] if payload is "" else payload.split("\x00")
 
-    @spec("<path>|")
-    def get_perms(self, path):
+    def get_permissions(self, path):
         """Returns a list of permissions for a given `path`, see
         :exc:`~pyxs.exceptions.InvalidPermission` for details on
         permission format.
 
         :param str path: path to get permissions for.
         """
-        return self.command(Op.GET_PERMS, path).rstrip("\x00").split("\x00")
+        payload = self.execute_command(Op.GET_PERMS, path)
+        return payload.split("\x00")
 
-    @spec("<path>|", "<perms>|+")
-    def set_perms(self, path, perms):
+    def set_permissions(self, path, perms):
         """Sets a access permissions for a given `path`, see
         :exc:`~pyxs.exceptions.InvalidPermission` for details on
         permission format.
@@ -329,7 +221,6 @@ class Client(object):
         """
         self.ack(Op.SET_PERMS, path, *perms)
 
-    @spec("<wpath>|", "<token>|")
     def watch(self, wpath, token):
         """Adds a watch.
 
@@ -343,7 +234,6 @@ class Client(object):
         """
         self.ack(Op.WATCH, wpath, token)
 
-    @spec("<wpath>|", "<token>|")
     def unwatch(self, wpath, token):
         """Removes a previously added watch.
 
@@ -359,15 +249,43 @@ class Client(object):
         second element is a token, passed to the :meth:`watch`.
         """
         if self.events:
-            return self.events.popleft()
+            packet = self.events.popleft()
+        else:
+            while True:
+                packet = self.connection.recv()
 
-        while True:
-            packet = self.connection.recv()
+                if packet.op is Op.WATCH_EVENT:
+                    break
 
-            if packet.op is Op.WATCH_EVENT:
-                return Event(*packet.payload.rstrip("\x00").split("\x00"))
+        return Event(*packet.payload.split("\x00")[:-1])
 
-    @spec("<domid>|")
+    def walk(self, top, topdown=True):
+        """Walk XenStore, yielding 3-tuples ``(path, value, children)``
+        for each node in the tree, rooted at node `top`.
+
+        :param str top: node to start from.
+        :param bool topdown: see :func:`os.walk` for details.
+        """
+        try:
+            children = self.ls(top)
+        except PyXSError:
+            return
+
+        try:
+            value = self.read(top)
+        except PyXSError:
+            value = ""  # '/' or no read permissions?
+
+        if topdown:
+            yield top, value, children
+
+        for child in children:
+            for x in self.walk(posixpath.join(top, child)):
+                yield x
+
+        if not topdown:
+            yield top, value, children
+
     def get_domain_path(self, domid):
         """Returns the domain's base path, as is used for relative
         transactions: ex: ``"/local/domain/<domid>"``. If a given
@@ -375,34 +293,32 @@ class Client(object):
 
         :param int domid: domain to get base path for.
         """
-        return self.command(Op.GET_DOMAIN_PATH, domid)
+        return self.execute_command(Op.GET_DOMAIN_PATH, domid)
 
-    @spec("<domid>|")
     def is_domain_introduced(self, domid):
-        """Returns ``True` if ``xenstored`` is in communication with
+        """Returns ``True`` if ``xenstored`` is in communication with
         the domain; that is when `INTRODUCE` for the domain has not
         yet been followed by domain destruction or explicit
         `RELEASE`; and ``False`` otherwise.
 
         :param int domid: domain to check status for.
         """
-        return {
-            "T": True,
-            "F": False
-        }.get(self.command(Op.IS_DOMAIN_INTRODUCED, domid).rstrip("\x00"))
+        payload = self.execute_command(Op.IS_DOMAIN_INTRODUCED, domid)
+        return {"T": True, "F": False}[payload]
 
-    @spec("<domid>|", "<mfn>|", "<eventchn>|")
-    def introduce(self, domid, mfn, eventchn):
+    def introduce_domain(self, domid, mfn, eventchn):
         """Tells ``xenstored`` to communicate with this domain.
 
         :param int domid: a real domain id, (``0`` is forbidden).
         :param long mfn: address of xenstore page in `domid`.
-        :param int eventch: an unbound event chanel in `domid`.
+        :param int eventchn: an unbound event chanel in `domid`.
         """
+        if not domid:
+            raise ValueError("Dom0 cannot be introduced.")
+
         self.ack(Op.INTRODUCE, domid, mfn, eventchn)
 
-    @spec("<domid>|")
-    def release(self, domid):
+    def release_domain(self, domid):
         """Manually requests ``xenstored`` to disconnect from the
         domain.
 
@@ -410,24 +326,24 @@ class Client(object):
 
         .. note:: ``xenstored`` will in any case detect domain
                   destruction and disconnect by itself.
-
-        .. todo:: make sure it's only executed from Dom0.
         """
+        if not self.SU:
+            raise error(errno.EPERM)
+
         self.ack(Op.RELEASE, domid)
 
-    @spec("<domid>|")
-    def resume(self, domid):
+    def resume_domain(self, domid):
         """Tells ``xenstored`` to clear its shutdown flag for a
         domain. This ensures that a subsequent shutdown will fire the
         appropriate watches.
 
         :param int domid: domain to resume.
-
-        .. todo:: make sure it's only executed from Dom0.
         """
+        if not self.SU:
+            raise error(errno.EPERM)
+
         self.ack(Op.RESUME, domid)
 
-    @spec("<domid>|", "<tdomid>|")
     def set_target(self, domid, target):
         """Tells ``xenstored`` that a domain is targetting another one,
         so it should let it tinker with it. This grants domain `domid`
@@ -437,9 +353,10 @@ class Client(object):
 
         :param int domid: domain to set target for.
         :param int target: target domain (yours truly, Captain).
-
-        .. todo:: make sure it's only executed from Dom0.
         """
+        if not self.SU:
+            raise error(errno.EPERM)
+
         self.ack(Op.SET_TARGET, domid, target)
 
     def transaction_start(self):
@@ -451,15 +368,15 @@ class Client(object):
            Currently ``xenstored`` has a bug that after 2^32 transactions
            it will allocate id 0 for an actual transaction.
         """
-        return int(self.command(Op.TRANSACTION_START, "\x00") .rstrip("\x00"))
-
+        payload = self.execute_command(Op.TRANSACTION_START, "")
+        return int(payload)
 
     def transaction_end(self, commit=True):
         """End a transaction currently in progress; if no transaction is
         running no command is sent to XenStore.
         """
         if self.tx_id:
-            self.ack(Op.TRANSACTION_END, ["F", "T"][commit] + "\x00")
+            self.ack(Op.TRANSACTION_END, ["F", "T"][commit])
             self.tx_id = 0
 
     def transaction(self):
@@ -478,7 +395,7 @@ class Client(object):
                                            and active transaction.
         """
         if self.tx_id:
-            raise PyXSError(errno.EALREADY, os.strerror(errno.EALREADY))
+            raise error(errno.EALREADY)
 
         return Client(connection=copy.copy(self.connection),
                       transaction=True)

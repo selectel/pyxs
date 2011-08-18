@@ -4,6 +4,8 @@
     ~~
 
     ``xenstore-ls`` implementation with :mod:`pyxs`.
+
+    :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
 """
 
 from __future__ import print_function, unicode_literals
@@ -15,19 +17,15 @@ from pyxs.client import Client, XenBusConnection, UnixSocketConnection
 from pyxs.exceptions import PyXSError
 
 
-def traverse(c, node, prefix=()):
-    if not node: return                 # Looks like we've reached the bottom.
+def main(client, top):
+    depth = top.count("/")
 
-    depth = max(0, (len(prefix) - 1) * 2)
+    for path, value, children in client.walk(top):
+        if path == top: continue
 
-    prefix += (node, )                  # Updating prefix with another node ..
-    path = posixpath.join(*prefix)      # . and joining the resulting path.
-
-    if path != node:                    # Don't print the root node.
-        print("{0}{1} = {2!r}".format(" " * depth, node, c.read(path)))
-
-    for child in c.directory(path):     # Repeat everything for each child.
-        traverse(c, child, prefix)
+        node = posixpath.basename(path) or "/"
+        print("{0}{1} = \"{2}\"".format(" " * (path.count("/") - depth - 1),
+                                        node, value))
 
 
 if __name__ == "__main__":
@@ -44,7 +42,4 @@ if __name__ == "__main__":
 
     [path] = args[:1] or ["/"]
 
-    try:
-        traverse(Client(connection=connection), path)
-    except PyXSError as e:
-        print(e)
+    main(Client(connection=connection), path)

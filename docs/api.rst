@@ -7,6 +7,9 @@ API reference
 .. automodule:: pyxs.client
     :members:
 
+.. automodule:: pyxs.connection
+    :members:
+
 .. automodule:: pyxs.helpers
     :members:
 

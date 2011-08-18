@@ -6,8 +6,8 @@
     Pure Python bindings for communicating with XenStore. Currently two
     backend options are available:
 
-    * over a Unix socket with :class:`~pyxs.client.UnixSocketConnection`;
-    * over XenBus_ with :class:`~pyxs.client.XenBusConnection`.
+    * over a Unix socket with :class:`~pyxs.connection.UnixSocketConnection`;
+    * over XenBus_ with :class:`~pyxs.connection.XenBusConnection`.
 
     Which backend is used is determined by the arguments used for
     :class:`~pyxs.client.Client` initialization, for example the
@@ -19,8 +19,9 @@
     >>> Client()
     <pyxs.client.Client object at 0xb74109cc>
 
-    Use ``xen_bus_path``, if initialize a :class:`~pyxs.client.Client`
-    over XenBus_:
+    Use ``xen_bus_path`` argument to initialize a
+    :class:`~pyxs.client.Client`, communicating with XenStore over
+    XenBus_:
 
     >>> Client(xen_bus_path="/proc/xen/xenbus")
     <pyxs.client.Client object at 0xb7410d2c>
@@ -32,4 +33,5 @@
 
 from .client import Client
 from .exceptions import PyXSError, ConnectionError, UnexpectedPacket, \
-    InvalidOperation, InvalidPath, InvalidPayload, InvalidTerm
+    InvalidOperation, InvalidPath, InvalidPayload
+from ._compat import xs, Error

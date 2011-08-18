@@ -41,7 +41,7 @@ Operations = Op = namedtuple("Operations", [
     "RESUME",
     "SET_TARGET",
     "RESTRICT"
-])(*(range(20) + [128]))
+])(*(list(range(20)) + [128]))
 
 
 Event = namedtuple("Event", "path token")
@@ -65,9 +65,6 @@ class Packet(namedtuple("_Packet", "op rq_id tx_id size payload")):
     _struct = struct.Struct(b"IIII")
 
     def __new__(cls, op, payload, rq_id=None, tx_id=None):
-        if isinstance(payload, unicode):
-            payload = payload.encode("utf-8")
-
         # Checking restrictions:
         # a) payload is limited to 4096 bytes.
         if len(payload) > 4096:
@@ -77,8 +74,4 @@ class Packet(namedtuple("_Packet", "op rq_id tx_id size payload")):
             raise InvalidOperation(op)
 
         return super(Packet, cls).__new__(cls,
-            op, rq_id or 0, tx_id or 0 , len(payload), payload)
-
-    def __str__(self):
-        # Note the ``[:-1]`` slice -- the actual payload is excluded.
-        return self._struct.pack(*self[:-1]) + self.payload
+            op, rq_id or 0, tx_id or 0, len(payload), payload)

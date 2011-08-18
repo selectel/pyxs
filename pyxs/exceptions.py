@@ -10,8 +10,8 @@
 """
 
 __all__ = [
-    "InvalidOperation", "InvalidPayload", "InvalidPath", "InvalidTerm",
-    "InvalidPermission", "ConnectionError", "UnexpectedPacket"
+    "InvalidOperation", "InvalidPayload", "InvalidPath", "InvalidPermission",
+    "ConnectionError", "UnexpectedPacket"
 ]
 
 
@@ -49,14 +49,6 @@ class InvalidPath(ValueError, PyXSError):
 
     :param bytes path: invalid path value.
 """
-
-
-class InvalidTerm(SyntaxError, PyXSError):
-    """Exception raised by :func:`~pyxs.helpers.compile` when a given
-    term is invalid, i. e. doesn't match any of the recognized forms.
-
-    :param bytes term: invalid term value.
-    """
 
 
 class InvalidPermission(ValueError, PyXSError):
