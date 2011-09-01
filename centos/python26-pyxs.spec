@@ -8,8 +8,9 @@ Vendor:	    	Selectel
 License:    	LGPL
 Group:	    	Development/Libraries/Python
 URL:            http://docs.selectel.org/pyxs
-Source0:        http://scm.selectel.org/cgit.cgi/pyxs.git/snapshot/pyxs-%{version}.tar.gz
+Source0:        http://scm.selectel.org/pyxs.git/snapshot/pyxs-%{version}.tar.gz
 Requires:       python26
+BuildArch:      noarch
 BuildRequires:  python26-setuptools
 BuildRoot:      %{_tmppath}/pyxs-%{version}-%{release}-root-%(%{__id_u} -n)
 
