@@ -13,13 +13,13 @@ from pyxs import Client
 
 
 with Client() as c:
-    c.watch("@introduceDomain", "introduced")
-    c.watch("@releaseDomain", "released")
+    monitor = c.monitor()
+    monitor.watch("@introduceDomain", "introduced")
+    monitor.watch("@releaseDomain", "released")
 
-    while True:
+    for path, token in monitor:
         # Funny thing is -- XenStored doesn't send us domid of the
         # event target, so we have to get it manually, via ``xc``.
-        path, token = c.wait()
         if token == "introduced":
             print("Hey, we got a new domain here!")
         else:

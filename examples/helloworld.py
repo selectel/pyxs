@@ -42,10 +42,11 @@ def run(**kwargs):
 
         # e) let's watch some paths!
         c.write("/foo/bar", "baz")
-        c.watch("/foo/bar", "baz")
+        m = c.monitor()
+        m.watch("/foo/bar", "baz")
         print("Watching ... do `$ xenstore-write /foo/bar <anything>`.")
-        print(c.wait())
-        c.unwatch("/foo/bar", "baz")
+        print(m.next())
+        m.unwatch("/foo/bar", "baz")
 
         # f) domain managment commands.
         print(c.get_domain_path(0))
