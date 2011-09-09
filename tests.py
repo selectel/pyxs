@@ -175,6 +175,7 @@ def test_client_execute_command():
     c.COMMAND_VALIDATORS[Op.DEBUG] = lambda *args: False
     with pytest.raises(ValueError):
         c.execute_command(Op.DEBUG, "foo")
+    c.COMMAND_VALIDATORS.pop(Op.DEBUG)
 
     # c) ``Packet`` constructor fails.
     with pytest.raises(InvalidPayload):
