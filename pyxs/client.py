@@ -412,7 +412,7 @@ class Monitor(object):
         is event path, i.e. the actual path that was modified and
         second element is a token, passed to the :meth:`watch`.
         """
-        if self.events:
+        if self.monitor.events:
             packet = self.client.events.popleft()
         else:
             while True:
