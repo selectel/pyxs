@@ -8,6 +8,8 @@ Version 0.3
 - Moved all PUBSUB functionality into a separate `Monitor` class, which
   uses a *separate* connection. That way, we'll never have to worry
   about mixing incoming XenStore events and command replies.
+- Fixed a couple of nasty bugs in concurrent use of `Client.wait()`
+  with other commands (see above).
 
 Version 0.2
 -----------
