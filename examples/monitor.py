@@ -17,7 +17,7 @@ with Client() as c:
     monitor.watch("@introduceDomain", "introduced")
     monitor.watch("@releaseDomain", "released")
 
-    for path, token in monitor:
+    for path, token in monitor.wait(sleep=.1):
         # Funny thing is -- XenStored doesn't send us domid of the
         # event target, so we have to get it manually, via ``xc``.
         if token == "introduced":

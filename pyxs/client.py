@@ -20,6 +20,7 @@ import copy
 import errno
 import re
 import threading
+import time
 import posixpath
 from collections import deque
 
@@ -406,29 +407,24 @@ class Monitor(object):
         """
         self.client.ack(Op.UNWATCH, wpath, token)
 
-    def wait(self):
+    def wait(self, sleep=None):
         """Waits for any of the watched paths to generate an event,
         which is a ``(path, token)`` pair, where the first element
         is event path, i.e. the actual path that was modified and
         second element is a token, passed to the :meth:`watch`.
+
+        :param float sleep: number of seconds to sleep between event
+                            checks.
         """
-        if self.client.events:
-            packet = self.client.events.popleft()
-        else:
-            while True:
-                with self.client.tx_lock:
-                    packet = self.client.connection.recv()
-
-                if packet.op is Op.WATCH_EVENT:
-                    break
-
-        return Event(*packet.payload.split("\x00")[:-1])
-
-    # Iterator protocol.
-    # ..................
-
-    next = wait
-
-    def __iter__(self):
         while True:
-            yield self.wait()
+            if self.client.events:
+                packet = self.client.events.popleft()
+                return Event(*packet.payload.split("\x00")[:-1])
+
+            # Executing a noop, hopefuly we'll get some events queued
+            # in the meantime. Note: I know it sucks, but it seems like
+            # there's no other way ...
+            self.client.execute_command(Op.DEBUG, "")
+
+            if sleep is not None:
+                time.sleep(sleep)
