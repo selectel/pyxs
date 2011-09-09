@@ -386,6 +386,13 @@ class Monitor(object):
     def __init__(self, connection):
         self.client = Client(connection=connection)
 
+    def __enter__(self):
+        self.client.__enter__()
+        return self
+
+    def __exit__(self, *args):
+        self.client.__exit__(*args)
+
     def watch(self, wpath, token):
         """Adds a watch.
 
