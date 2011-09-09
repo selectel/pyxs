@@ -14,11 +14,12 @@
 
 from __future__ import absolute_import, unicode_literals
 
-__all__ = ["Client"]
+__all__ = ["Client", "Monitor"]
 
 import copy
 import errno
 import re
+import threading
 import posixpath
 from collections import deque
 
@@ -88,6 +89,7 @@ class Client(object):
             self.connection = XenBusConnection(xen_bus_path)
 
         self.tx_id = 0
+        self.tx_lock = threading.Lock()
         self.events = deque()
 
         if transaction:  # Requesting a new transaction id.
@@ -114,34 +116,35 @@ class Client(object):
         elif not all(re.match("^[\x00\x20-\x7f]+$", arg) for arg in args):
             raise ValueError(args)
 
-        kwargs["tx_id"] = self.tx_id  # Forcing ``tx_id`` here.
-        self.connection.send(Packet(op, "".join(args), **kwargs))
+        with self.tx_lock:
+            kwargs["tx_id"] = self.tx_id  # Forcing ``tx_id`` here.
+            self.connection.send(Packet(op, "".join(args), **kwargs))
 
-        # If we have any watched paths `XenStore` will send watch events
-        # mixed with replies to other operations, so we loop untill we
-        # recieve a packet with an expected operation type.
-        while True:
-            packet = self.connection.recv()
+            # If we have any watched paths `XenStore` will send watch
+            # events mixed with replies to other operations, so we loop
+            # until we recieve a packet with an expected operation type.
+            while True:
+                packet = self.connection.recv()
 
-            # According to ``xenstore.txt`` erroneous responses start with
-            # a capital E and end with ``NULL``-byte.
-            if packet.op is Op.ERROR:
-                raise error(packet.payload[:-1])
-            # Incoming packet should either be a watch event or have the
-            # same operation type as the packet sent.
-            elif packet.op is Op.WATCH_EVENT:
-                self.events.append(packet)
-            elif packet.op is not op:
-                raise UnexpectedPacket(packet)
-            # Making sure sent and recieved packets are within the same
-            # transaction -- not relevant for # `XenBusConnection`, for
-            # some reason it sometimes returns *random* values of tx_id
-            # and rq_id.
-            elif (not isinstance(self.connection, XenBusConnection) and
-                  packet.tx_id is not self.tx_id):
-                raise UnexpectedPacket(packet)
-            else:
-                break
+                # According to ``xenstore.txt`` erroneous responses start
+                # with a capital E and end with ``NULL``-byte.
+                if packet.op is Op.ERROR:
+                    raise error(packet.payload[:-1])
+                # Incoming packet should either be a watch event or have
+                # the same operation type as the packet sent.
+                elif packet.op is Op.WATCH_EVENT:
+                    self.events.append(packet)
+                elif packet.op is not op:
+                    raise UnexpectedPacket(packet)
+                # Making sure sent and recieved packets are within the
+                # same transaction -- not relevant for # `XenBusConnection`,
+                # for some reason it sometimes returns *random* values
+                # of tx_id and rq_id.
+                elif (not isinstance(self.connection, XenBusConnection) and
+                      packet.tx_id is not self.tx_id):
+                    raise UnexpectedPacket(packet)
+                else:
+                    break
 
         return packet.payload.rstrip("\x00")
 
@@ -220,44 +223,6 @@ class Client(object):
         :param list perms: a list of permissions to set.
         """
         self.ack(Op.SET_PERMS, path, *perms)
-
-    def watch(self, wpath, token):
-        """Adds a watch.
-
-        When a `path` is modified (including path creation, removal,
-        contents change or permissions change) this generates an event
-        on the changed `path`. Changes made in transactions cause an
-        event only if and when committed.
-
-        :param str wpath: path to watch.
-        :param str token: watch token, returned in watch notification.
-        """
-        self.ack(Op.WATCH, wpath, token)
-
-    def unwatch(self, wpath, token):
-        """Removes a previously added watch.
-
-        :param str wpath: path to unwatch.
-        :param str token: watch token, passed to :meth:`watch`.
-        """
-        self.ack(Op.UNWATCH, wpath, token)
-
-    def wait(self):
-        """Waits for any of the watched paths to generate an event,
-        which is a ``(path, token)`` pair, where the first element
-        is event path, i.e. the actual path that was modified and
-        second element is a token, passed to the :meth:`watch`.
-        """
-        if self.events:
-            packet = self.events.popleft()
-        else:
-            while True:
-                packet = self.connection.recv()
-
-                if packet.op is Op.WATCH_EVENT:
-                    break
-
-        return Event(*packet.payload.split("\x00")[:-1])
 
     def walk(self, top, topdown=True):
         """Walk XenStore, yielding 3-tuples ``(path, value, children)``
@@ -379,6 +344,12 @@ class Client(object):
             self.ack(Op.TRANSACTION_END, ["F", "T"][commit])
             self.tx_id = 0
 
+    def monitor(self):
+        """Returns a new :class:`Monitor` instance, which is currently
+        *the only way* of doing PUBSUB.
+        """
+        return Monitor(connection=copy.copy(self.connection))
+
     def transaction(self):
         """Returns a new :class:`Client` instance, operating within a
         new transaction; can only be used only when no transaction is
@@ -399,3 +370,64 @@ class Client(object):
 
         return Client(connection=copy.copy(self.connection),
                       transaction=True)
+
+
+class Monitor(object):
+    """XenStore monitor -- allows minimal PUBSUB-like functionality
+    on top of XenStore.
+
+    >>> m = Client().monitor()
+    >>> m.watch("foo/bar")
+    >>> m.wait()
+    Event(...)
+    """
+
+    def __init__(self, connection):
+        self.client = Client(connection=connection)
+
+    def watch(self, wpath, token):
+        """Adds a watch.
+
+        When a `path` is modified (including path creation, removal,
+        contents change or permissions change) this generates an event
+        on the changed `path`. Changes made in transactions cause an
+        event only if and when committed.
+
+        :param str wpath: path to watch.
+        :param str token: watch token, returned in watch notification.
+        """
+        self.client.ack(Op.WATCH, wpath, token)
+
+    def unwatch(self, wpath, token):
+        """Removes a previously added watch.
+
+        :param str wpath: path to unwatch.
+        :param str token: watch token, passed to :meth:`watch`.
+        """
+        self.client.ack(Op.UNWATCH, wpath, token)
+
+    def wait(self):
+        """Waits for any of the watched paths to generate an event,
+        which is a ``(path, token)`` pair, where the first element
+        is event path, i.e. the actual path that was modified and
+        second element is a token, passed to the :meth:`watch`.
+        """
+        if self.events:
+            packet = self.client.events.popleft()
+        else:
+            while True:
+                packet = self.client.connection.recv()
+
+                if packet.op is Op.WATCH_EVENT:
+                    break
+
+        return Event(*packet.payload.split("\x00")[:-1])
+
+    # Iterator protocol.
+    # ..................
+
+    next = wait
+
+    def __iter__(self):
+        while True:
+            yield self.wait()
