@@ -138,7 +138,8 @@ class UnixSocketConnection(FileDescriptorConnection):
 
         try:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sock.settimeout(self.socket_timeout)
+            if self.socket_timeout is not None:
+                sock.settimeout(self.socket_timeout)
             sock.connect(self.path)
         except socket.error as e:
             raise ConnectionError("Error connecting to {0!r}: {1}"
