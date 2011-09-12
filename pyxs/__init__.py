@@ -31,7 +31,14 @@
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
 """
 
-from .client import Client
+from .client import Client, Monitor
 from .exceptions import PyXSError, ConnectionError, UnexpectedPacket, \
     InvalidOperation, InvalidPath, InvalidPayload
 from ._compat import xs, Error
+
+
+def monitor(*args, **kwargs):
+    """A simple shortcut for creating :class:`Monitor` instances.
+    All arguments are passed to :class:`Client` constructor.
+    """
+    return Client(*args, **kwargs).monitor()

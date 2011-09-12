@@ -175,6 +175,7 @@ def test_client_execute_command():
     c.COMMAND_VALIDATORS[Op.DEBUG] = lambda *args: False
     with pytest.raises(ValueError):
         c.execute_command(Op.DEBUG, "foo")
+    c.COMMAND_VALIDATORS.pop(Op.DEBUG)
 
     # c) ``Packet`` constructor fails.
     with pytest.raises(InvalidPayload):
@@ -388,21 +389,22 @@ def test_watches():
     for backend in [UnixSocketConnection, XenBusConnection]:
         c = Client(connection=backend())
         c.write("/foo/bar", "baz")
-        c.watch("/foo/bar", "boo")
+        m = c.monitor()
+        m.watch("/foo/bar", "boo")
 
         # a) we receive the first event immediately, so `wait()` doesn't
         #    block.
-        assert c.wait() == ("/foo/bar", "boo")
+        assert m.wait() == ("/foo/bar", "boo")
 
         # b) before the second call we have to make sure someone
         #    will change the path being watched.
         Timer(.5, lambda: c.write("/foo/bar", "baz")).run()
-        assert c.wait() == ("/foo/bar", "boo")
+        assert m.wait() == ("/foo/bar", "boo")
 
         # c) changing a children of the watched path triggers watch
         #    event as well.
         Timer(.5, lambda: c.write("/foo/bar/baz", "???")).run()
-        assert c.wait() == ("/foo/bar/baz", "boo")
+        assert m.wait() == ("/foo/bar/baz", "boo")
 
 
 @virtualized

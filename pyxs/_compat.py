@@ -69,19 +69,22 @@ class xs(Client):
         else:
             return True
 
+    def monitor(self):
+        return Monitor(connection=self.connection)
+
     def watch(self, path, token):
         # Even though ``xs.watch`` docstring states that token should be
         # a string, it in fact can be any Python object; and unfortunately
         # some scripts rely on that behaviour.
         stub = str(id(token))
         self.watches[stub] = token
-        return super(xs, self).watch(path, stub)
+        return self.monitor().watch(path, stub)
 
     def unwatch(self, path, token):
         stub = str(id(token))
         self.watches.pop(stub, None)
-        return super(xs, self).unwatch(path, stub)
+        return self.monitor().unwatch(path, stub)
 
     def read_watch(self):
-        event = super(xs, self).wait()
+        event = self.monitor().wait()
         return event._replace(token=self.watches[event.token])
