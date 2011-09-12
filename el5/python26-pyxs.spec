@@ -2,7 +2,7 @@
 
 Summary:    	Pure Python bindings to XenStore
 Name:	    	python26-pyxs
-Version:    	0.2
+Version:    	0.3
 Release:    	1.selectel%{?dist}
 Vendor:	    	Selectel
 License:    	LGPL
