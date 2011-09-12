@@ -1,4 +1,4 @@
-recursive-include centos *
+recursive-include el5 *
 recursive-include examples *
 recursive-include pyxs *.py
 include CHANGES
