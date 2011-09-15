@@ -4,10 +4,11 @@
     ~~~~~~~~~~~
 
     This module implements XenStore client, which uses multiple connection
-    options for communication: :class:`UnixSocketConnection` and
-    :class:`XenBusConnection`. Note however, that the latter one can
-    be a bit buggy, when dealing with ``WATCH_EVENT`` packets, so
-    using :class:`UnixSocketConnection` is preferable.
+    options for communication: :class:`.connection.UnixSocketConnection`
+    and :class:`.connection.XenBusConnection`. Note however, that the
+    latter one can be a bit buggy, when dealing with ``WATCH_EVENT``
+    packets, so using :class:`.connection.UnixSocketConnection` is
+    preferable.
 
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
 """
@@ -35,14 +36,14 @@ class Client(object):
     """XenStore client -- <useful comment>.
 
     :param str xen_bus_path: path to XenBus device, implies that
-                             :class:`~pyxs.connectionXenBusConnection`
+                             :class:`~pyxs.connection.XenBusConnection`
                              is used as a backend.
     :param str unix_socket_path: path to XenStore Unix domain socket,
         usually something like ``/var/run/xenstored/socket`` -- implies
         that :class:`~pyxs.connection.UnixSocketConnection` is used
         as a backend.
-    :param float socket_timeout: see :func:`socket.settimeout` for
-                                 details.
+    :param float socket_timeout: see :meth:`~socket.socket.settimeout`
+                                 for details.
     :param bool transaction: if ``True`` :meth:`transaction_start` will
                              be issued right after connection is
                              established.

@@ -115,8 +115,8 @@ class UnixSocketConnection(FileDescriptorConnection):
     :param str path: path to XenStore unix domain socket, if not
                      provided explicitly is restored from process
                      environment -- similar to what ``libxs`` does.
-    :param float socket_timeout: see :func:`socket.settimeout` for
-                                 details.
+    :param float socket_timeout: see :func:`~socket.socket.settimeout`
+                                 for details.
     """
     def __init__(self, path=None, socket_timeout=None):
         if path is None:
