@@ -312,6 +312,12 @@ def test_rm():
         with pytest.raises(PyXSError):
             c.read("/foo/bar")
 
+        try:
+            c.read("/foo/bar", "baz") == "baz"  # using a default option.
+        except PyXSError:
+            pytest.fail("No error should've been raised, got: {0}"
+                        .format(e))
+
         assert c.read("/foo") == ""
 
 

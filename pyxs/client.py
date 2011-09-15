@@ -156,12 +156,20 @@ class Client(object):
     # Public API.
     # ...........
 
-    def read(self, path):
+    def read(self, path, default=None):
         """Reads data from a given path.
 
         :param str path: a path to read from.
+        :param str default: default value, to be used if `path` doesn't
+                            exist.
         """
-        return self.execute_command(Op.READ, path)
+        try:
+            return self.execute_command(Op.READ, path)
+        except PyXSError as e:
+            if e.args[0] is errno.ENOENT and default is not None:
+                return default
+
+            raise
 
     __getitem__ = read
 
