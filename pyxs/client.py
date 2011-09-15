@@ -138,7 +138,7 @@ class Client(object):
                 elif packet.op is not op:
                     raise UnexpectedPacket(packet)
                 # Making sure sent and recieved packets are within the
-                # same transaction -- not relevant for # `XenBusConnection`,
+                # same transaction -- not relevant for `XenBusConnection`,
                 # for some reason it sometimes returns *random* values
                 # of tx_id and rq_id.
                 elif (not isinstance(self.connection, XenBusConnection) and

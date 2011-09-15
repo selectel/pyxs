@@ -3,7 +3,16 @@ pyxs Changelog
 
 Here you can see the full list of changes between each pyxs release.
 
+Version 0.4
+-----------
+
+- Added `default` argument to `Client.read()`, which acts similar to
+  `dict.get()`.
+
 Version 0.3
+-----------
+
+Released on September 12ve 2011
 
 - Moved all PUBSUB functionality into a separate `Monitor` class, which
   uses a *separate* connection. That way, we'll never have to worry
