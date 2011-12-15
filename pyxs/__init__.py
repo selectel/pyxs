@@ -29,6 +29,7 @@
     .. _XenBus: http://wiki.xensource.com/xenwiki/XenBus
 
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
+    :license: LGPL, see LICENSE for more details.
 """
 
 from .client import Client, Monitor
