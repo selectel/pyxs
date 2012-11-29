@@ -32,6 +32,11 @@
     :license: LGPL, see LICENSE for more details.
 """
 
+__all__ = ["Client", "Monitor",
+           "PyXSError", "ConnectionError", "UnexpectedPacket",
+           "InvalidOperation", "InvalidPath", "InvalidPayload",
+           "xs", "Error"]
+
 from .client import Client, Monitor
 from .exceptions import PyXSError, ConnectionError, UnexpectedPacket, \
     InvalidOperation, InvalidPath, InvalidPayload
