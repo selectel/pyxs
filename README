@@ -6,7 +6,7 @@
         : .; `: :; :`.  .'`._-.'
         : ._.'`._. ;:_,._;`.__.'
         : :    .-. :
-        :_;    `._.'         0.3
+        :_;    `._.'       0.3.1
 
         -- XenStore access the Python way!
 
@@ -17,4 +17,3 @@ What is ``pyxs``?
 What is ``pyxs``? It's a pure Python XenStore client implementation, which
 coveres all of the ``libxs`` features and adds some nice Pythonic sugar on
 top of it.
-
