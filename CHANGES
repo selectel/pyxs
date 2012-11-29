@@ -3,16 +3,19 @@ pyxs Changelog
 
 Here you can see the full list of changes between each pyxs release.
 
-Version 0.4
------------
+Version 0.3.1
+-------------
+
+Released on November 29th 2012
 
 - Added `default` argument to `Client.read()`, which acts similar to
   `dict.get()`.
+- Fixed a lot of minor quirks so `pyxs` can be Debianized.
 
 Version 0.3
 -----------
 
-Released on September 12ve 2011
+Released on September 12th 2011
 
 - Moved all PUBSUB functionality into a separate `Monitor` class, which
   uses a *separate* connection. That way, we'll never have to worry
