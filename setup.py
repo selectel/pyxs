@@ -53,7 +53,7 @@ setup(name="pyxs",
       platforms=["any"],
 
       author="Sergei Lebedev",
-      author_email="lebedev@selectel.ru",
+      author_email="superbobry@gmail.com",
       description=DESCRIPTION,
       long_description=LONG_DESCRIPTION,
       classifiers=CLASSIFIERS,
