@@ -7,11 +7,12 @@
     using ``xen.lowlevel.xs``.
 
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
+    :license: LGPL, see LICENSE for more details.
 """
 
 __all__ = ["xs", "Error"]
 
-from .client import Client
+from .client import Client, Monitor
 from .exceptions import PyXSError as Error
 
 

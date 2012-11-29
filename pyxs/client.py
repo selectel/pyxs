@@ -4,12 +4,14 @@
     ~~~~~~~~~~~
 
     This module implements XenStore client, which uses multiple connection
-    options for communication: :class:`UnixSocketConnection` and
-    :class:`XenBusConnection`. Note however, that the latter one can
-    be a bit buggy, when dealing with ``WATCH_EVENT`` packets, so
-    using :class:`UnixSocketConnection` is preferable.
+    options for communication: :class:`.connection.UnixSocketConnection`
+    and :class:`.connection.XenBusConnection`. Note however, that the
+    latter one can be a bit buggy, when dealing with ``WATCH_EVENT``
+    packets, so using :class:`.connection.UnixSocketConnection` is
+    preferable.
 
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
+    :license: LGPL, see LICENSE for more details.
 """
 
 from __future__ import absolute_import, unicode_literals
@@ -35,14 +37,14 @@ class Client(object):
     """XenStore client -- <useful comment>.
 
     :param str xen_bus_path: path to XenBus device, implies that
-                             :class:`~pyxs.connectionXenBusConnection`
+                             :class:`~pyxs.connection.XenBusConnection`
                              is used as a backend.
     :param str unix_socket_path: path to XenStore Unix domain socket,
         usually something like ``/var/run/xenstored/socket`` -- implies
         that :class:`~pyxs.connection.UnixSocketConnection` is used
         as a backend.
-    :param float socket_timeout: see :func:`socket.settimeout` for
-                                 details.
+    :param float socket_timeout: see :meth:`~socket.socket.settimeout`
+                                 for details.
     :param bool transaction: if ``True`` :meth:`transaction_start` will
                              be issued right after connection is
                              established.
@@ -138,7 +140,7 @@ class Client(object):
                 elif packet.op is not op:
                     raise UnexpectedPacket(packet)
                 # Making sure sent and recieved packets are within the
-                # same transaction -- not relevant for # `XenBusConnection`,
+                # same transaction -- not relevant for `XenBusConnection`,
                 # for some reason it sometimes returns *random* values
                 # of tx_id and rq_id.
                 elif (not isinstance(self.connection, XenBusConnection) and
@@ -156,12 +158,20 @@ class Client(object):
     # Public API.
     # ...........
 
-    def read(self, path):
+    def read(self, path, default=None):
         """Reads data from a given path.
 
         :param str path: a path to read from.
+        :param str default: default value, to be used if `path` doesn't
+                            exist.
         """
-        return self.execute_command(Op.READ, path)
+        try:
+            return self.execute_command(Op.READ, path)
+        except PyXSError as e:
+            if e.args[0] is errno.ENOENT and default is not None:
+                return default
+
+            raise
 
     __getitem__ = read
 

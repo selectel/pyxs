@@ -29,7 +29,13 @@
     .. _XenBus: http://wiki.xensource.com/xenwiki/XenBus
 
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
+    :license: LGPL, see LICENSE for more details.
 """
+
+__all__ = ["Client", "Monitor",
+           "PyXSError", "ConnectionError", "UnexpectedPacket",
+           "InvalidOperation", "InvalidPath", "InvalidPayload",
+           "xs", "Error"]
 
 from .client import Client, Monitor
 from .exceptions import PyXSError, ConnectionError, UnexpectedPacket, \

@@ -7,6 +7,7 @@
     :mod:`pyxs` classes.
 
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
+    :license: LGPL, see LICENSE for more details.
 """
 
 __all__ = [
