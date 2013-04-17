@@ -225,7 +225,7 @@ class Client(object):
         payload = self.execute_command(Op.GET_PERMS, path)
         return payload.split("\x00")
 
-    def set_permissions(self, path, perms):
+    def set_permissions(self, path, *perms):
         """Sets a access permissions for a given `path`, see
         :exc:`~pyxs.exceptions.InvalidPermission` for details on
         permission format.
