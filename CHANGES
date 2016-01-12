@@ -11,19 +11,19 @@ Version 0.3.1
 
 Released on November 29th 2012
 
-- Added `default` argument to `Client.read()`, which acts similar to
-  `dict.get()`.
-- Fixed a lot of minor quirks so `pyxs` can be Debianized.
+- Added ``default`` argument to ``Client.read()``, which acts similar to
+  ``dict.get()``.
+- Fixed a lot of minor quirks so ``pyxs`` can be Debianized.
 
 Version 0.3
 -----------
 
 Released on September 12th 2011
 
-- Moved all PUBSUB functionality into a separate `Monitor` class, which
+- Moved all PUBSUB functionality into a separate ``Monitor`` class, which
   uses a *separate* connection. That way, we'll never have to worry
   about mixing incoming XenStore events and command replies.
-- Fixed a couple of nasty bugs in concurrent use of `Client.wait()`
+- Fixed a couple of nasty bugs in concurrent use of ``Client.wait()``
   with other commands (see above).
 
 Version 0.2
@@ -32,26 +32,26 @@ Version 0.2
 Released on August 18th 2011
 
 - Completely refactored validation -- no more `@spec` magic, everything
-  is checked explicitly inside `Client.execute_command()`.
+  is checked explicitly inside ``Client.execute_command()``.
 - Added a compatibility interface, which mimics `xen.lowlevel.xs`
-  behaviour, using `pyxs` as a backend, see pyxs/_compat.py.
+  behaviour, using ``pyxs`` as a backend, see pyxs/_compat.py.
 - Restricted `SET_TARGET`, `INTRODUCE` and `RELEASE` operations to
-  Dom0 only -- `/proc/xen/capabilities` is used to check domain
+  Dom0 only -- ``/proc/xen/capabilities`` is used to check domain
   role.
-- Fixed a bug in `Client.wait()` -- queued watch events weren't wrapped
-  in `pyxs._internal.Event` class, unlike the received ones.
-- Added `Client.walk()` method for walking XenStore tree -- similar to
-  `os.walk()`
+- Fixed a bug in ``Client.wait()`` -- queued watch events weren't wrapped
+  in ``pyxs._internal.Event`` class, unlike the received ones.
+- Added ``Client.walk()`` method for walking XenStore tree -- similar to
+  ``os.walk()``
 
 Version 0.1
--------------
+-----------
 
 Initial release, released on July 16th 2011
 
 - Added a complete implementation of XenStore protocol, including
-  transactions and path watching, see `pyxs.Client` for details.
+  transactions and path watching, see ``pyxs.Client`` for details.
 - Added generic validation helper -- `@spec`, which forces arguments
   to match the scheme from the wire protocol specification.
-- Added two connection backends -- `XenBusConnection` for connecting
-  from DomU through a block device and `UnixSocketConnection`,
+- Added two connection backends -- ``XenBusConnection`` for connecting
+  from DomU through a block device and ``UnixSocketConnection``,
   communicating with ``xenstored`` via a Unix domain socket.

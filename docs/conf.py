@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.abspath('..'))
 extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.intersphinx',
               'sphinx.ext.todo',
-              'sphinx.ext.viewcode']
+              'sphinx.ext.linkcode']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -89,13 +89,56 @@ pygments_style = 'sphinx'
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
 
+linkcode_base_url = "https://github.com/selectel/pyxs/tree/"
+
+def resolve_tag():
+    from urllib.request import urlopen
+    from urllib.error import HTTPError
+    try:
+        urlopen(linkcode_base_url + release)
+    except HTTPError:
+        return "master"
+    else:
+        return release
+
+
+tag = resolve_tag()
+
+
+# Resolve function for the linkcode extension.
+def linkcode_resolve(domain, info):
+    def find_source():
+        # try to find the file and line number, based on code from numpy:
+        # https://github.com/numpy/numpy/blob/master/doc/source/conf.py#L286
+        obj = sys.modules[info['module']]
+        for part in info['fullname'].split('.'):
+            obj = getattr(obj, part)
+
+        import inspect
+        import os
+        import pyxs
+        fn = inspect.getsourcefile(obj)
+        fn = os.path.relpath(fn, os.path.dirname(pyte.__file__))
+        source, lineno = inspect.getsourcelines(obj)
+        return fn, lineno, lineno + len(source) - 1
+
+    try:
+        filename = 'pyxs/%s#L%d-L%d' % find_source()
+    except Exception:
+        return None  # Failed to resolve source or line numbers.
+
+    return linkcode_base_url + "%s/%s" % (tag, filename)
 
 # -- Options for HTML output ---------------------------------------------------
 
-# The theme to use for HTML and HTML Help pages.  See the documentation for
-# a list of builtin themes.
-html_theme = 'default'
-html_style = 'rtd.css'
+## Read the docs style:
+try:
+    import sphinx_rtd_theme
+except ImportError:
+    html_theme = 'classic'
+else:
+    html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+    html_theme = 'sphinx_rtd_theme'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
