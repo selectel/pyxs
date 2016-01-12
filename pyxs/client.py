@@ -168,7 +168,7 @@ class Client(object):
         try:
             return self.execute_command(Op.READ, path)
         except PyXSError as e:
-            if e.args[0] is errno.ENOENT and default is not None:
+            if e.args[0] == errno.ENOENT and default is not None:
                 return default
 
             raise
@@ -213,7 +213,7 @@ class Client(object):
         :param str path: path to list.
         """
         payload = self.execute_command(Op.DIRECTORY, path)
-        return [] if payload is "" else payload.split("\x00")
+        return [] if not payload else payload.split("\x00")
 
     def get_permissions(self, path):
         """Returns a list of permissions for a given `path`, see
