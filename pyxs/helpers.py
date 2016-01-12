@@ -20,7 +20,7 @@ import os
 import posixpath
 import sys
 
-if sys.version_info[0] is not 3:
+if sys.version_info[0] < 3:
     bytes, str = str, unicode
 
 from .exceptions import InvalidPath, InvalidPermission, PyXSError
@@ -132,8 +132,8 @@ def validate_watch_path(wpath):
     :param str wpath: watch path to check.
     :raises pyxs.exceptions.InvalidPath: when path fails to validate.
     """
-    if (wpath.startswith("@") and not
-        re.match("^@(?:introduceDomain|releaseDomain)\x00?$", wpath)):
+    if (wpath.startswith("@") and
+        not re.match("^@(?:introduceDomain|releaseDomain)\x00?$", wpath)):
         raise InvalidPath(wpath)
     else:
         validate_path(wpath)
