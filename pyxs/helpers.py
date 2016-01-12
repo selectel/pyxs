@@ -133,7 +133,7 @@ def validate_watch_path(wpath):
     :raises pyxs.exceptions.InvalidPath: when path fails to validate.
     """
     if (wpath.startswith("@") and
-        not re.match("^@(?:introduceDomain|releaseDomain)\x00?$", wpath)):
+            not re.match("^@(?:introduceDomain|releaseDomain)\x00?$", wpath)):
         raise InvalidPath(wpath)
     else:
         validate_path(wpath)

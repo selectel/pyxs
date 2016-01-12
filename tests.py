@@ -264,7 +264,7 @@ def test_client_read():
         try:
             c.read("/foo/bar")
         except PyXSError as e:
-            assert e.args[0] is errno.ENOENT
+            assert e.args[0] == errno.ENOENT
 
         # b) OK-case (`/local` is allways in place).
         assert c.read("/local") == ""
@@ -335,7 +335,7 @@ def test_ls():
         try:
             c.ls("/path/to/something")
         except PyXSError as e:
-            assert e.args[0] is errno.ENOENT
+            assert e.args[0] == errno.ENOENT
 
         # c) No list permissions (should be ran in DomU)?
 
