@@ -82,7 +82,7 @@ def error(smth):
     >>> error("EINVAL")
     pyxs.exceptions.PyXSError: (22, 'Invalid argument')
     """
-    if isinstance(smth, basestring):
+    if isinstance(smth, bytes):
         smth = _codeerror.get(smth, 0)
 
     return PyXSError(smth, os.strerror(smth))
