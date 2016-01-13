@@ -5,8 +5,13 @@ Here you can see the full list of changes between each pyxs release.
 
 Version 0.3.2
 -------------
-- Fxed a bug in ``Client.set_permissions`` which coerced permission
+- Fixed a bug in ``Client.set_permissions`` which coerced permission
   lists (e.g. ``["b0"]``) to repr-strings prior to validation.
+- The API is now based around ``bytes``, which means that all methods
+  which used to accept ``str`` (or text) now require ``bytes``. XenStore
+  paths and values are specfified to be 7-bit ASCII, thus it makes little
+  sense to allow any Unicode string as input and then validate if it
+  matches the spec.
 
 Version 0.3.1
 -------------
