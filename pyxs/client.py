@@ -32,6 +32,8 @@ from .exceptions import UnexpectedPacket, PyXSError
 from .helpers import validate_path, validate_watch_path, validate_perms, \
     dict_merge, error
 
+_re_7bit_ascii = re.compile(b"^[\x00\x20-\x7f]+$")
+
 
 class Client(object):
     """XenStore client -- <useful comment>.
@@ -115,7 +117,7 @@ class Client(object):
     def execute_command(self, op, *args, **kwargs):
         if not self.COMMAND_VALIDATORS.get(op, lambda *args: True)(*args):
             raise ValueError(args)
-        elif not all(re.match(b"^[\x00\x20-\x7f]+$", arg) for arg in args):
+        elif not all(map(_re_7bit_ascii.match, args)):
             raise ValueError(args)
 
         with self.tx_lock:
@@ -143,7 +145,7 @@ class Client(object):
                 # for some reason it sometimes returns *random* values
                 # of tx_id and rq_id.
                 elif (not isinstance(self.connection, XenBusConnection) and
-                      packet.tx_id is not self.tx_id):
+                      packet.tx_id != self.tx_id):
                     raise UnexpectedPacket(packet)
                 else:
                     break
@@ -268,7 +270,7 @@ class Client(object):
         :param int domid: domain to get base path for.
         """
         return self.execute_command(Op.GET_DOMAIN_PATH,
-                                    str(domid).encode("ascii") + NUL)
+                                    str(domid).encode() + NUL)
 
     def is_domain_introduced(self, domid):
         """Returns ``True`` if ``xenstored`` is in communication with

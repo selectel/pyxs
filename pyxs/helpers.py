@@ -85,6 +85,9 @@ def error(smth):
     return PyXSError(smth, os.strerror(smth))
 
 
+_re_path = re.compile(b"^[a-zA-Z0-9-/_@]+\x00?$")
+
+
 def validate_path(path):
     """Checks if a given path is valid, see
     :exc:`~pyxs.exceptions.InvalidPath` for details.
@@ -95,9 +98,7 @@ def validate_path(path):
     # Paths longer than 3072 bytes are forbidden; clients specifying
     # relative paths should keep them to within 2048 bytes.
     max_len = 3072 if posixpath.abspath(path) else 2048
-
-    if not (re.match(b"^[a-zA-Z0-9-/_@]+\x00?$", path) and
-            len(path) <= max_len):
+    if not _re_path.match(path) or len(path) > max_len:
         raise InvalidPath(path)
 
     # A path is not allowed to have a trailing /, except for the
@@ -108,6 +109,9 @@ def validate_path(path):
     return path
 
 
+_re_watch_path = re.compile(b"^@(?:introduceDomain|releaseDomain)\x00?$")
+
+
 def validate_watch_path(wpath):
     """Checks if a given watch path is valid -- it should either be a
     valid path or a special, starting with ``@`` character.
@@ -115,13 +119,15 @@ def validate_watch_path(wpath):
     :param bytes wpath: watch path to check.
     :raises pyxs.exceptions.InvalidPath: when path fails to validate.
     """
-    if (wpath.startswith(b"@") and
-            not re.match(b"^@(?:introduceDomain|releaseDomain)\x00?$", wpath)):
+    if wpath.startswith(b"@") and not _re_watch_path.match(wpath):
         raise InvalidPath(wpath)
     else:
         validate_path(wpath)
 
     return wpath
+
+
+_re_perms = re.compile(b"[wrbn]\d+")
 
 
 def validate_perms(perms):
@@ -133,7 +139,7 @@ def validate_perms(perms):
         when any of the permissions fail to validate.
     """
     for perm in perms:
-        if not re.match(b"[wrbn]\d+", perm):
+        if not _re_perms.match(perm):
             raise InvalidPermission(perm)
 
     return perms
