@@ -17,3 +17,11 @@ What is ``pyxs``?
 What is ``pyxs``? It's a pure Python XenStore client implementation, which
 coveres all of the ``libxs`` features and adds some nice Pythonic sugar on
 top of it.
+
+Installation
+------------
+
+If you have `pip <https://pip.pypa.io/en/stable>`_ you can do the usual
+``pip install pyxs``. Otherwise, download the source from
+`GitHub <https://github.com/selectel/pyxs>`_ and run
+``python setup.py install``.
