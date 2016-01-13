@@ -9,7 +9,7 @@ from pyxs.client import Client
 from pyxs.connection import UnixSocketConnection, XenBusConnection
 from pyxs.exceptions import InvalidPayload, InvalidPermission, \
     UnexpectedPacket, PyXSError
-from pyxs._internal import Op, Packet
+from pyxs._internal import NUL, Op, Packet
 
 
 def setup_function(f):
@@ -75,31 +75,31 @@ def test_client_context_manager():
 @virtualized
 def test_client_execute_command():
     c = Client()
-    c.execute_command(Op.WRITE, b"/foo/bar", b"baz")
+    c.execute_command(Op.WRITE, b"/foo/bar" + NUL, b"baz")
 
     # a) arguments contain invalid characters.
     with pytest.raises(ValueError):
-        c.execute_command(Op.DEBUG, b"\x07foo")
+        c.execute_command(Op.DEBUG, b"\x07foo" + NUL)
 
     # b) command validator fails.
     c.COMMAND_VALIDATORS[Op.DEBUG] = lambda *args: False
     with pytest.raises(ValueError):
-        c.execute_command(Op.DEBUG, b"foo")
+        c.execute_command(Op.DEBUG, b"foo" + NUL)
     c.COMMAND_VALIDATORS.pop(Op.DEBUG)
 
     # c) ``Packet`` constructor fails.
     with pytest.raises(InvalidPayload):
-        c.execute_command(Op.WRITE, b"/foo/bar", b"baz" * 4096)
+        c.execute_command(Op.WRITE, b"/foo/bar" + NUL, b"baz" * 4096)
 
     # d) XenStore returned an error code.
     with pytest.raises(PyXSError):
-        c.execute_command(Op.READ, b"/path/to/something")
+        c.execute_command(Op.READ, b"/path/to/something" + NUL)
 
     _old_recv = c.connection.recv
     # e) XenStore returns a packet with invalid operation in the header.
-    c.connection.recv = lambda *args: Packet(Op.DEBUG, b"boo")
+    c.connection.recv = lambda *args: Packet(Op.DEBUG, b"boo" + NUL)
     with pytest.raises(UnexpectedPacket):
-        c.execute_command(Op.READ, b"/foo/bar")
+        c.execute_command(Op.READ, b"/foo/bar" + NUL)
     c.connection.recv = _old_recv
 
     # d) XenStore returns a packet with invalid transaction id in the
@@ -132,7 +132,7 @@ def test_client_execute_command():
 
     # Cleaning up.
     with Client() as c:
-        c.execute_command(Op.RM, b"/foo/bar")
+        c.execute_command(Op.RM, b"/foo/bar" + NUL)
 
 
 @virtualized
