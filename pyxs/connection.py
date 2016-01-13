@@ -41,6 +41,10 @@ class FileDescriptorConnection(object):
         raise NotImplementedError(
             "__init__() should be overridden by subclasses.")
 
+    @property
+    def is_active(self):
+        return self.fd is not None
+
     def disconnect(self, silent=True):
         """Disconnects from XenStore.
 
@@ -48,7 +52,7 @@ class FileDescriptorConnection(object):
                             while closing the file descriptor are
                             suppressed.
         """
-        if self.fd is None:
+        if not self.is_active:
             return
 
         try:
@@ -66,8 +70,9 @@ class FileDescriptorConnection(object):
             expected to be validated, since no checks are done at
             that point.
         """
-        if not self.fd:
+        if not self.is_active:
             self.connect()
+        # TODO: ^^^ remove this auto-connection logic.
 
         # Note the ``[:-1]`` slice -- the actual payload is excluded.
         data = packet._struct.pack(*packet[:-1]) + packet.payload
@@ -85,7 +90,7 @@ class FileDescriptorConnection(object):
 
     def recv(self):
         """Receives a packet from XenStore."""
-        if not self.fd:
+        if not self.is_active:
             self.connect()
 
         try:
@@ -132,7 +137,7 @@ class UnixSocketConnection(FileDescriptorConnection):
         return self.__class__(self.path, self.socket_timeout)
 
     def connect(self):
-        if self.fd:
+        if self.is_active:
             return
 
         try:
@@ -174,7 +179,7 @@ class XenBusConnection(FileDescriptorConnection):
         return self.__class__(self.path)
 
     def connect(self):
-        if self.fd:
+        if self.is_active:
             return
 
         try:

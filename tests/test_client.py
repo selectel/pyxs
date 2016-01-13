@@ -26,16 +26,16 @@ def test_client_init():
     assert c.tx_id == 0
     assert not c.events
     assert isinstance(c.connection, UnixSocketConnection)
-    assert c.connection.fd is None
+    assert not c.connection.is_active
 
     c = Client(unix_socket_path="/var/run/xenstored/socket")
     assert isinstance(c.connection, UnixSocketConnection)
-    assert c.connection.fd is None
+    assert not c.connection.is_active
 
     # b) XenBusConnection
     c = Client(xen_bus_path="/proc/xen/xenbus")
     assert isinstance(c.connection, XenBusConnection)
-    assert c.connection.fd is None
+    assert not c.connection.is_active
 
 
 virtualized = pytest.mark.skipif(
@@ -47,7 +47,7 @@ def test_client_transaction():
     # Making sure ``tx_id`` is acquired if transaction argument is not
     # ``False``.
     c = Client(transaction=True)
-    assert c.connection.fd
+    assert c.connection.is_active
     assert c.tx_id != 0
 
 
@@ -55,17 +55,16 @@ def test_client_transaction():
 def test_client_context_manager():
     # a) no transaction is running
     c = Client()
-    assert c.connection.fd is None
+    assert not c.connection.is_active
 
     with c:
-        assert c.connection.fd
+        assert c.connection.is_active
 
-    assert c.connection.fd is None
+    assert not c.connection.is_active
 
     # b) transaction in progress -- expecting it to be commited on
     #    context manager exit.
     c = Client(transaction=True)
-
     with c:
         assert c.tx_id != 0
 
