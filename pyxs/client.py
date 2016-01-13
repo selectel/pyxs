@@ -231,7 +231,7 @@ class Client(object):
         :param bytes path: path to set permissions for.
         :param list perms: a list of permissions to set.
         """
-        self.ack(Op.SET_PERMS, path + NUL, *perms)
+        self.ack(Op.SET_PERMS, path + NUL, *(perm + NUL for perm in perms))
 
     def walk(self, top, topdown=True):
         """Walk XenStore, yielding 3-tuples ``(path, value, children)``
