@@ -18,13 +18,14 @@ from pyxs.exceptions import PyXSError
 
 
 def main(client, top):
-    depth = top.count("/")
+    depth = top.count(b"/")
 
     for path, value, children in client.walk(top):
-        if path == top: continue
+        if path == top:
+            continue
 
-        node = posixpath.basename(path) or "/"
-        print("{0}{1} = \"{2}\"".format(" " * (path.count("/") - depth - 1),
+        node = posixpath.basename(path) or b"/"
+        print("{0}{1} = \"{2}\"".format(" " * (path.count(b"/") - depth - 1),
                                         node, value))
 
 
@@ -42,4 +43,4 @@ if __name__ == "__main__":
 
     [path] = args[:1] or ["/"]
 
-    main(Client(connection=connection), path)
+    main(Client(connection=connection), path.encode("ascii"))

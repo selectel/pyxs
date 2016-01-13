@@ -16,37 +16,37 @@ from pyxs import Client, PyXSError
 def run(**kwargs):
     with Client(**kwargs) as c:
         # a) write-read.
-        c.write("/foo/bar", "baz")
-        print(c.read("/foo/bar"))  # ==> "baz"
+        c.write(b"/foo/bar", b"baz")
+        print(c.read(b"/foo/bar"))  # ==> "baz"
 
         # b) exceptions! let's try to read a non-existant path.
         try:
-            c.read("/path/to/something/useless")
+            c.read(b"/path/to/something/useless")
         except PyXSError as e:
             print(e)
 
         # c) okay, time to delete that /foo/bar path.
-        c.rm("/foo/bar")
+        c.rm(b"/foo/bar")
 
         try:
-            c.read("/foo/bar")
+            c.read(b"/foo/bar")
         except PyXSError as e:
             print("`/foo/bar` is no moar!")
 
         # d) directory listing and permissions.
-        c.mkdir("/foo/bar")
-        c.mkdir("/foo/baz")
-        c.mkdir("/foo/boo")
-        print("Here's what `/foo` has: ", c.ls("/foo"))
-        print(c.get_permissions("/foo"))
+        c.mkdir(b"/foo/bar")
+        c.mkdir(b"/foo/baz")
+        c.mkdir(b"/foo/boo")
+        print("Here's what `/foo` has: ", c.ls(b"/foo"))
+        print(c.get_permissions(b"/foo"))
 
         # e) let's watch some paths!
-        c.write("/foo/bar", "baz")
+        c.write(b"/foo/bar", b"baz")
         with c.monitor() as m:
-            m.watch("/foo/bar", "baz")
+            m.watch(b"/foo/bar", b"baz")
             print("Watching ... do `$ xenstore-write /foo/bar <anything>`.")
             print(m.wait())
-            m.unwatch("/foo/bar", "baz")
+            m.unwatch(b"/foo/bar", b"baz")
 
         # f) domain managment commands.
         print(c.get_domain_path(0))
@@ -55,10 +55,10 @@ def run(**kwargs):
         # g) transactions.
         with c.transaction() as t:
             print("Creating a `/bar/foo` within a transaction.")
-            t.write("/bar/foo", "baz")
+            t.write(b"/bar/foo", b"baz")
 
         print("Transaction is over -- let's check it: "
-              "/bar/foo =", c.read("/bar/foo"))
+              "/bar/foo =", c.read(b"/bar/foo"))
 
 print("Using Unix domain socket connection:")
 print("------------------------------------")

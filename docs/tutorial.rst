@@ -15,9 +15,9 @@ need to fetch or update some XenStore items you can do::
 
    >>> from pyxs import Client
    >>> with Client() as c:
-   ...     c["/local/domain/0/name"] = "Domain0"
-   ...     c["/local/domain/0/name"]
-   'Domain0'
+   ...     c[b"/local/domain/0/name"] = b"Domain0"
+   ...     c[b"/local/domain/0/name"]
+   b'Domain0'
 
 .. note:: Even though :class:`~pyxs.client.Client` does support
           :func:`dict`-like lookups, they have nothing else in common
@@ -36,11 +36,11 @@ you commit them**. Here's an example::
 
     >>> c = Client()
     >>> with c.transaction() as t:
-    ...    t["/foo/bar"] = "baz"
+    ...    t[b"/foo/bar"] = b"baz"
     ...    t.transaction_end(commit=True)
     ...
-    >>> c["/foo/bar"]
-    'baz'
+    >>> c[b"/foo/bar"]
+    b'baz'
 
 The second line inside ``with`` statement is completely optional,
 since the default behaviour is to commit everything on context manager
@@ -59,9 +59,9 @@ within the active transaction. After that, incoming events can be
 fetched by calling :meth:`~pyxs.client.Client.wait`::
 
     >>> with Client() as c:
-    ...    c.watch("/foo/bar", "a unique token")
+    ...    c.watch(b"/foo/bar", b"a unique token")
     ...    c.wait()
-    Event("/foo/bar", "a unique token")
+    Event(b"/foo/bar", b"a unique token")
 
 XenStore also has a notion of `special` paths, which are reserved for
 special occasions:
@@ -97,5 +97,5 @@ in the code to switch to :mod:`pyxs`::
 
    >>> from pyxs import xs
    >>> xs = xs()
-   >>> xs.read(0, "/local/domain/0/name")
-   'Domain0'
+   >>> xs.read(0, b"/local/domain/0/name")
+   v'Domain0'
