@@ -14,7 +14,7 @@
     :license: LGPL, see LICENSE for more details.
 """
 
-from __future__ import absolute_import, unicode_literals
+from __future__ import absolute_import
 
 __all__ = ["Client", "Monitor"]
 
@@ -26,11 +26,11 @@ import time
 import posixpath
 from collections import deque
 
-from ._internal import Event, Packet, Op
+from ._internal import NUL, Event, Packet, Op
 from .connection import UnixSocketConnection, XenBusConnection
 from .exceptions import UnexpectedPacket, PyXSError
 from .helpers import validate_path, validate_watch_path, validate_perms, \
-    dict_merge, force_unicode, error
+    dict_merge, error
 
 
 class Client(object):
@@ -77,12 +77,12 @@ class Client(object):
     #: A flag, which is ``True`` if we're operating on control domain
     #: and else otherwise.
     try:
-        SU = open("/proc/xen/capabilities").read() == "control_d\n"
+        SU = open("/proc/xen/capabilities", "rb").read() == b"control_d\n"
     except (IOError, OSError):
         SU = False
 
     def __init__(self, unix_socket_path=None, socket_timeout=None,
-                 xen_bus_path=None, connection=None, transaction=None):
+                 xen_bus_path=None, connection=None, transaction=False):
         if connection:
             self.connection = connection
         elif unix_socket_path or not xen_bus_path:
@@ -95,10 +95,11 @@ class Client(object):
         self.tx_lock = threading.Lock()
         self.events = deque()
 
-        if transaction:  # Requesting a new transaction id.
+        if transaction:  # Obtain a transaction id.
             self.tx_id = self.transaction_start()
 
     def __enter__(self):
+        # TODO: move tx_id initialization here.
         self.connection.connect()
         return self
 
@@ -112,25 +113,23 @@ class Client(object):
     # ............
 
     def execute_command(self, op, *args, **kwargs):
-        args = [force_unicode(arg) + "\x00" for arg in args]
-
         if not self.COMMAND_VALIDATORS.get(op, lambda *args: True)(*args):
             raise ValueError(args)
-        elif not all(re.match("^[\x00\x20-\x7f]+$", arg) for arg in args):
+        elif not all(re.match(b"^[\x00\x20-\x7f]+$", arg) for arg in args):
             raise ValueError(args)
 
         with self.tx_lock:
             kwargs["tx_id"] = self.tx_id  # Forcing ``tx_id`` here.
-            self.connection.send(Packet(op, "".join(args), **kwargs))
+            self.connection.send(Packet(op, b"".join(args), **kwargs))
 
-            # If we have any watched paths `XenStore` will send watch
+            # If we have any watched paths XenStore will send watch
             # events mixed with replies to other operations, so we loop
             # until we recieve a packet with an expected operation type.
             while True:
                 packet = self.connection.recv()
 
                 # According to ``xenstore.txt`` erroneous responses start
-                # with a capital E and end with ``NULL``-byte.
+                # with a capital E and end with ``NUL``-byte.
                 if packet.op is Op.ERROR:
                     raise error(packet.payload[:-1])
                 # Incoming packet should either be a watch event or have
@@ -149,10 +148,10 @@ class Client(object):
                 else:
                     break
 
-        return packet.payload.rstrip("\x00")
+        return packet.payload.rstrip(NUL)
 
     def ack(self, *args):
-        if self.execute_command(*args) != "OK":
+        if self.execute_command(*args) != b"OK":
             raise PyXSError("Ooops ...")
 
     # Public API.
@@ -166,7 +165,7 @@ class Client(object):
                             exist.
         """
         try:
-            return self.execute_command(Op.READ, path)
+            return self.execute_command(Op.READ, path + NUL)
         except PyXSError as e:
             if e.args[0] == errno.ENOENT and default is not None:
                 return default
@@ -178,11 +177,10 @@ class Client(object):
     def write(self, path, value):
         """Writes data to a given path.
 
-        :param value: data to write (can be of any type, but will be
-                      coerced to :func:`bytes` eventually).
-        :param str path: a path to write to.
+        :param bytes value: data to write.
+        :param bytes path: a path to write to.
         """
-        self.ack(Op.WRITE, path, value)
+        self.ack(Op.WRITE, path + NUL, value)
 
     __setitem__ = write
 
@@ -191,9 +189,9 @@ class Client(object):
         missing parents with empty values. If `path` or any parent
         already exist, its value is left unchanged.
 
-        :param str path: path to directory to create.
+        :param bytes path: path to directory to create.
         """
-        self.ack(Op.MKDIR, path)
+        self.ack(Op.MKDIR, path + NUL)
 
     def rm(self, path):
         """Ensures that a given does not exist, by deleting it and all
@@ -201,45 +199,45 @@ class Client(object):
         it **is** an error if `path`'s immediate parent does not exist
         either.
 
-        :param str path: path to directory to remove.
+        :param bytes path: path to directory to remove.
         """
-        self.ack(Op.RM, path)
+        self.ack(Op.RM, path + NUL)
 
     __delitem__ = rm
 
     def ls(self, path):
         """Returns a list of names of the immediate children of `path`.
 
-        :param str path: path to list.
+        :param bytes path: path to list.
         """
-        payload = self.execute_command(Op.DIRECTORY, path)
-        return [] if not payload else payload.split("\x00")
+        payload = self.execute_command(Op.DIRECTORY, path + NUL)
+        return [] if not payload else payload.split(NUL)
 
     def get_permissions(self, path):
         """Returns a list of permissions for a given `path`, see
         :exc:`~pyxs.exceptions.InvalidPermission` for details on
         permission format.
 
-        :param str path: path to get permissions for.
+        :param bytes path: path to get permissions for.
         """
-        payload = self.execute_command(Op.GET_PERMS, path)
-        return payload.split("\x00")
+        payload = self.execute_command(Op.GET_PERMS, path + NUL)
+        return payload.split(NUL)
 
     def set_permissions(self, path, perms):
         """Sets a access permissions for a given `path`, see
         :exc:`~pyxs.exceptions.InvalidPermission` for details on
         permission format.
 
-        :param str path: path to set permissions for.
+        :param bytes path: path to set permissions for.
         :param list perms: a list of permissions to set.
         """
-        self.ack(Op.SET_PERMS, path, *perms)
+        self.ack(Op.SET_PERMS, path + NUL, *perms)
 
     def walk(self, top, topdown=True):
         """Walk XenStore, yielding 3-tuples ``(path, value, children)``
         for each node in the tree, rooted at node `top`.
 
-        :param str top: node to start from.
+        :param bytes top: node to start from.
         :param bool topdown: see :func:`os.walk` for details.
         """
         try:
@@ -250,7 +248,7 @@ class Client(object):
         try:
             value = self.read(top)
         except PyXSError:
-            value = ""  # '/' or no read permissions?
+            value = b""  # '/' or no read permissions?
 
         if topdown:
             yield top, value, children
@@ -269,7 +267,8 @@ class Client(object):
 
         :param int domid: domain to get base path for.
         """
-        return self.execute_command(Op.GET_DOMAIN_PATH, domid)
+        return self.execute_command(Op.GET_DOMAIN_PATH,
+                                    str(domid).encode("ascii") + NUL)
 
     def is_domain_introduced(self, domid):
         """Returns ``True`` if ``xenstored`` is in communication with
@@ -279,20 +278,24 @@ class Client(object):
 
         :param int domid: domain to check status for.
         """
-        payload = self.execute_command(Op.IS_DOMAIN_INTRODUCED, domid)
-        return {"T": True, "F": False}[payload]
+        payload = self.execute_command(Op.IS_DOMAIN_INTRODUCED,
+                                       str(domid).encode() + NUL)
+        return {b"T": True, b"F": False}[payload]
 
     def introduce_domain(self, domid, mfn, eventchn):
         """Tells ``xenstored`` to communicate with this domain.
 
         :param int domid: a real domain id, (``0`` is forbidden).
-        :param long mfn: address of xenstore page in `domid`.
+        :param int mfn: address of xenstore page in `domid`.
         :param int eventchn: an unbound event chanel in `domid`.
         """
         if not domid:
             raise ValueError("Dom0 cannot be introduced.")
 
-        self.ack(Op.INTRODUCE, domid, mfn, eventchn)
+        self.ack(Op.INTRODUCE,
+                 str(domid).encode() + NUL,
+                 str(mfn).encode() + NUL,
+                 str(eventchn).encode() + NUL)
 
     def release_domain(self, domid):
         """Manually requests ``xenstored`` to disconnect from the
@@ -306,7 +309,7 @@ class Client(object):
         if not self.SU:
             raise error(errno.EPERM)
 
-        self.ack(Op.RELEASE, domid)
+        self.ack(Op.RELEASE, str(domid).encode() + NUL)
 
     def resume_domain(self, domid):
         """Tells ``xenstored`` to clear its shutdown flag for a
@@ -318,7 +321,7 @@ class Client(object):
         if not self.SU:
             raise error(errno.EPERM)
 
-        self.ack(Op.RESUME, domid)
+        self.ack(Op.RESUME, str(domid).encode() + NUL)
 
     def set_target(self, domid, target):
         """Tells ``xenstored`` that a domain is targetting another one,
@@ -333,7 +336,8 @@ class Client(object):
         if not self.SU:
             raise error(errno.EPERM)
 
-        self.ack(Op.SET_TARGET, domid, target)
+        self.ack(Op.SET_TARGET, str(domid).encode() + NUL,
+                 str(target).encode() + NUL)
 
     def transaction_start(self):
         """Starts a new transaction and returns transaction handle, which
@@ -344,7 +348,7 @@ class Client(object):
            Currently ``xenstored`` has a bug that after 2^32 transactions
            it will allocate id 0 for an actual transaction.
         """
-        payload = self.execute_command(Op.TRANSACTION_START, "")
+        payload = self.execute_command(Op.TRANSACTION_START, NUL)
         return int(payload)
 
     def transaction_end(self, commit=True):
@@ -352,7 +356,7 @@ class Client(object):
         running no command is sent to XenStore.
         """
         if self.tx_id:
-            self.ack(Op.TRANSACTION_END, ["F", "T"][commit])
+            self.ack(Op.TRANSACTION_END, b"FT"[commit] + NUL)
             self.tx_id = 0
 
     def monitor(self):
@@ -400,8 +404,8 @@ class Monitor(object):
         self.client.__enter__()
         return self
 
-    def __exit__(self, *args):
-        self.client.__exit__(*args)
+    def __exit__(self, *exc_info):
+        self.client.__exit__(*exc_info)
 
     def watch(self, wpath, token):
         """Adds a watch.
@@ -411,18 +415,18 @@ class Monitor(object):
         on the changed `path`. Changes made in transactions cause an
         event only if and when committed.
 
-        :param str wpath: path to watch.
-        :param str token: watch token, returned in watch notification.
+        :param bytes wpath: path to watch.
+        :param bytes token: watch token, returned in watch notification.
         """
-        self.client.ack(Op.WATCH, wpath, token)
+        self.client.ack(Op.WATCH, wpath + NUL, token + NUL)
 
     def unwatch(self, wpath, token):
         """Removes a previously added watch.
 
-        :param str wpath: path to unwatch.
-        :param str token: watch token, passed to :meth:`watch`.
+        :param bytes wpath: path to unwatch.
+        :param bytes token: watch token, passed to :meth:`watch`.
         """
-        self.client.ack(Op.UNWATCH, wpath, token)
+        self.client.ack(Op.UNWATCH, wpath + NUL, token + NUL)
 
     def wait(self, sleep=None):
         """Waits for any of the watched paths to generate an event,
@@ -436,12 +440,12 @@ class Monitor(object):
         while True:
             if self.client.events:
                 packet = self.client.events.popleft()
-                return Event(*packet.payload.split("\x00")[:-1])
+                return Event(*packet.payload.split(b"\x00")[:-1])
 
             # Executing a noop, hopefuly we'll get some events queued
             # in the meantime. Note: I know it sucks, but it seems like
             # there's no other way ...
-            self.client.execute_command(Op.DEBUG, "")
+            self.client.execute_command(Op.DEBUG, NUL)
 
             if sleep is not None:
                 time.sleep(sleep)

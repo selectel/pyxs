@@ -11,13 +11,15 @@
 
 from __future__ import unicode_literals
 
-__all__ = ["Event", "Op", "Packet"]
+__all__ = ["NUL", "Event", "Op", "Packet"]
 
 import struct
 from collections import namedtuple
 
 from .exceptions import InvalidOperation, InvalidPayload
 
+#: NUL byte.
+NUL = b"\x00"
 
 #: Operations supported by XenStore.
 Operations = Op = namedtuple("Operations", [

@@ -10,7 +10,7 @@
     :license: LGPL, see LICENSE for more details.
 """
 
-from __future__ import absolute_import, unicode_literals
+from __future__ import absolute_import
 
 __all__ = ["UnixSocketConnection", "XenBusConnection"]
 
@@ -38,7 +38,8 @@ class FileDescriptorConnection(object):
     fd = path = None
 
     def __init__(self):
-        raise NotImplemented("__init__() should be overridden by subclasses.")
+        raise NotImplementedError(
+            "__init__() should be overridden by subclasses.")
 
     def disconnect(self, silent=True):
         """Disconnects from XenStore.
@@ -69,8 +70,7 @@ class FileDescriptorConnection(object):
             self.connect()
 
         # Note the ``[:-1]`` slice -- the actual payload is excluded.
-        data = (packet._struct.pack(*packet[:-1]) +
-                packet.payload.encode("utf-8"))
+        data = packet._struct.pack(*packet[:-1]) + packet.payload
 
         try:
             writeall(self.fd, data)
@@ -104,9 +104,7 @@ class FileDescriptorConnection(object):
             # XXX XenBus seems to handle ``os.read(fd, 0)`` incorrectly,
             # blocking unless any new data appears, so we have to check
             # size value, before reading.
-            payload = ("" if size is 0 else
-                       os.read(self.fd, size).decode("utf-8"))
-
+            payload = b"" if not size else os.read(self.fd, size)
             return Packet(op, payload, rq_id, tx_id)
 
 

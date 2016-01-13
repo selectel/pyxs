@@ -10,10 +10,10 @@ def test_validate_path():
     # a) max length is bounded by 3072 for absolute path and 2048 for
     #    relative ones.
     with pytest.raises(InvalidPath):
-        validate_path("/foo/bar" * 3072)
+        validate_path(b"/foo/bar" * 3072)
 
     with pytest.raises(InvalidPath):
-        validate_path("foo/bar" * 2048)
+        validate_path(b"foo/bar" * 2048)
 
     # b) ASCII alphanumerics and -/_@ only!
     for char in string.punctuation:
@@ -21,58 +21,52 @@ def test_validate_path():
             continue
 
         with pytest.raises(InvalidPath):
-            validate_path("/foo" + char)
+            validate_path(b"/foo" + char.encode())
 
     # c) no trailing / -- except for root path.
     with pytest.raises(InvalidPath):
-        validate_path("/foo/")
+        validate_path(b"/foo/")
 
     # d) no //'s!.
     with pytest.raises(InvalidPath):
-        validate_path("/foo//bar")
+        validate_path(b"/foo//bar")
 
-    try:
-        validate_path("/")
-    except InvalidPath as p:
-        pytest.fail("{0} is prefectly valid, baby :)".format(p.args))
+    # e) OK-case.
+    validate_path(b"/")
 
 
 def test_validate_watch_path():
     # a) ordinary path should be checked with `validate_path()`
     with pytest.raises(InvalidPath):
-        validate_watch_path("/foo/")
+        validate_watch_path(b"/foo/")
 
     with pytest.raises(InvalidPath):
-        validate_watch_path("/fo\x07o")
+        validate_watch_path(b"/fo\x07o")
 
     with pytest.raises(InvalidPath):
-        validate_watch_path("/$/foo")
+        validate_watch_path(b"/$/foo")
 
     # b) special path options are limited to `@introduceDomain` and
     #    `@releaseDomain`.
     with pytest.raises(InvalidPath):
-        validate_watch_path("@foo")
+        validate_watch_path(b"@foo")
 
-    try:
-        validate_watch_path("@introduceDomain")
-        validate_watch_path("@releaseDomain")
-    except InvalidPath as p:
-        pytest.fail("{0} is prefectly valid, baby :)".format(p.args))
+    # c) OK-case.
+    validate_watch_path(b"@introduceDomain")
+    validate_watch_path(b"@releaseDomain")
 
 
 def test_validate_perms():
-    # a valid permission has a form `[wrbn]:digits:`.
+    # A valid permission has a form `[wrbn]:digits:`.
     with pytest.raises(InvalidPermission):
-        validate_perms(["foo"])
+        validate_perms([b"foo"])
 
     with pytest.raises(InvalidPermission):
-        validate_perms(["f20"])
+        validate_perms([b"f20"])
 
     with pytest.raises(InvalidPermission):
-        validate_perms(["r-20"])
+        validate_perms([b"r-20"])
 
-    try:
-        validate_perms("w0 r0 b0 n0".split())
-        validate_perms(["w999999"])  # valid, even though it overflows int32.
-    except InvalidPermission as p:
-        pytest.fail("{0} is prefectly valid, baby :)".format(p.args))
+    # OK-case
+    validate_perms(b"w0 r0 b0 n0".split())
+    validate_perms([b"w999999"])  # valid, even though it overflows int32.

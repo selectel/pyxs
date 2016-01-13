@@ -15,7 +15,7 @@ from pyxs._internal import Op, Packet
 def setup_function(f):
     try:
         with Client() as c:
-            c.rm("/foo")
+            c.rm(b"/foo")
     except PyXSError:
         pass
 
@@ -23,7 +23,7 @@ def setup_function(f):
 def test_client_init():
     # a) UnixSocketConnection
     c = Client()
-    assert c.tx_id is 0
+    assert c.tx_id == 0
     assert not c.events
     assert isinstance(c.connection, UnixSocketConnection)
     assert c.connection.fd is None
@@ -48,7 +48,7 @@ def test_client_transaction():
     # ``False``.
     c = Client(transaction=True)
     assert c.connection.fd
-    assert c.tx_id is not 0
+    assert c.tx_id != 0
 
 
 @virtualized
@@ -67,82 +67,72 @@ def test_client_context_manager():
     c = Client(transaction=True)
 
     with c:
-        assert c.tx_id is not 0
+        assert c.tx_id != 0
 
-    assert c.tx_id is 0
+    assert c.tx_id == 0
 
 
 @virtualized
 def test_client_execute_command():
     c = Client()
-    c.execute_command(Op.WRITE, "/foo/bar", "baz")
+    c.execute_command(Op.WRITE, b"/foo/bar", b"baz")
 
     # a) arguments contain invalid characters.
     with pytest.raises(ValueError):
-        c.execute_command(Op.DEBUG, "\x07foo")
+        c.execute_command(Op.DEBUG, b"\x07foo")
 
     # b) command validator fails.
     c.COMMAND_VALIDATORS[Op.DEBUG] = lambda *args: False
     with pytest.raises(ValueError):
-        c.execute_command(Op.DEBUG, "foo")
+        c.execute_command(Op.DEBUG, b"foo")
     c.COMMAND_VALIDATORS.pop(Op.DEBUG)
 
     # c) ``Packet`` constructor fails.
     with pytest.raises(InvalidPayload):
-        c.execute_command(Op.WRITE, "/foo/bar", "baz" * 4096)
+        c.execute_command(Op.WRITE, b"/foo/bar", b"baz" * 4096)
 
     # d) XenStore returned an error code.
     with pytest.raises(PyXSError):
-        c.execute_command(Op.READ, "/path/to/something")
+        c.execute_command(Op.READ, b"/path/to/something")
 
     _old_recv = c.connection.recv
     # e) XenStore returns a packet with invalid operation in the header.
-    c.connection.recv = lambda *args: Packet(Op.DEBUG, "boo")
+    c.connection.recv = lambda *args: Packet(Op.DEBUG, b"boo")
     with pytest.raises(UnexpectedPacket):
-        c.execute_command(Op.READ, "/foo/bar")
+        c.execute_command(Op.READ, b"/foo/bar")
     c.connection.recv = _old_recv
 
     # d) XenStore returns a packet with invalid transaction id in the
     #    header.
-    c.connection.recv = lambda *args: Packet(Op.READ, "boo", tx_id=42)
+    c.connection.recv = lambda *args: Packet(Op.READ, b"boo", tx_id=42)
     with pytest.raises(UnexpectedPacket):
-        c.execute_command(Op.READ, "/foo/bar")
+        c.execute_command(Op.READ, b"/foo/bar")
     c.connection.recv = _old_recv
 
     # e) ... and a hack for ``XenBusConnection``
     c = Client(connection=XenBusConnection())
-    c.connection.recv = lambda *args: Packet(Op.READ, "boo", tx_id=42)
-    try:
-        c.execute_command(Op.READ, "/foo/bar")
-    except UnexpectedPacket as e:
-        pytest.fail("No error should've been raised, got: {0}"
-                    .format(e))
+    c.connection.recv = lambda *args: Packet(Op.READ, b"boo", tx_id=42)
+    c.execute_command(Op.READ, b"/foo/bar")
     c.connection.recv = _old_recv
 
     # f) Got a WATCH_EVENT instead of an expected packet type, making
     #    sure it's queued properly.
     def recv(*args):
         if hasattr(recv, "called"):
-            return Packet(Op.READ, "boo")
+            return Packet(Op.READ, b"boo")
         else:
             recv.called = True
-            return Packet(Op.WATCH_EVENT, "boo")
+            return Packet(Op.WATCH_EVENT, b"boo")
     c.connection.recv = recv
-
-    try:
-        c.execute_command(Op.READ, "/foo/bar")
-    except UnexpectedPacket as e:
-        pytest.fail("No error should've been raised, got: {0}"
-                    .format(e))
-    else:
-        assert len(c.events) is 1
-        assert c.events[0] == Packet(Op.WATCH_EVENT, "boo")
+    c.execute_command(Op.READ, "/foo/bar")
+    assert len(c.events) == 1
+    assert c.events[0] == Packet(Op.WATCH_EVENT, b"boo")
 
     c.connection.recv = _old_recv
 
     # Cleaning up.
     with Client() as c:
-        c.execute_command(Op.RM, "/foo/bar")
+        c.execute_command(Op.RM, b"/foo/bar")
 
 
 @virtualized
@@ -150,19 +140,14 @@ def test_client_ack():
     c = Client()
 
     # a) OK-case.
-    c.connection.recv = lambda *args: Packet(Op.WRITE, "OK\x00")
-
-    try:
-        c.ack(Op.WRITE, "/foo", "bar")
-    except PyXSError as e:
-        pytest.fail("No error should've been raised, got: {0}"
-                    .format(e))
+    c.connection.recv = lambda *args: Packet(Op.WRITE, b"OK\x00")
+    c.ack(Op.WRITE, b"/foo", b"bar")
 
     # b) ... something went wrong.
-    c.connection.recv = lambda *args: Packet(Op.WRITE, "boo")
+    c.connection.recv = lambda *args: Packet(Op.WRITE, b"boo")
 
     with pytest.raises(PyXSError):
-        c.ack(Op.WRITE, "/foo", "bar")
+        c.ack(Op.WRITE, b"/foo", b"bar")
 
 
 with_backend = pytest.mark.parametrize("backend", [
@@ -177,13 +162,13 @@ def test_client_read(backend):
 
     # a) non-existant path.
     try:
-        c.read("/foo/bar")
+        c.read(b"/foo/bar")
     except PyXSError as e:
         assert e.args[0] == errno.ENOENT
 
     # b) OK-case (`/local` is allways in place).
-    assert c.read("/local") == ""
-    assert c["/local"] == ""
+    assert c.read("/local") == b""
+    assert c["/local"] == b""
 
     # c) No read permissions (should be ran in DomU)?
 
@@ -193,11 +178,11 @@ def test_client_read(backend):
 def test_write(backend):
     c = Client(connection=backend())
 
-    c.write("/foo/bar", "baz")
-    assert c.read("/foo/bar") == "baz"
+    c.write(b"/foo/bar", b"baz")
+    assert c.read(b"/foo/bar") == b"baz"
 
-    c["/foo/bar"] = "boo"
-    assert c["/foo/bar"] == "boo"
+    c[b"/foo/bar"] = b"boo"
+    assert c[b"/foo/bar"] == b"boo"
 
     # b) No write permissions (should be ran in DomU)?
 
@@ -207,75 +192,66 @@ def test_write(backend):
 def test_mkdir(backend):
     c = Client(connection=backend())
 
-    c.mkdir("/foo/bar")
-    assert c.ls("/foo") == ["bar"]
-    assert c.read("/foo/bar") == ""
+    c.mkdir(b"/foo/bar")
+    assert c.ls(b"/foo") == [b"bar"]
+    assert c.read(b"/foo/bar") == b""
 
 
 @virtualized
 @with_backend
 def test_rm(backend):
     c = Client(connection=backend())
-    c.mkdir("/foo/bar")
-
-    try:
-        c.rm("/foo/bar")
-    except PyXSError as e:
-        pytest.fail("No error should've been raised, got: {0}"
-                    .format(e))
+    c.mkdir(b"/foo/bar")
+    c.rm(b"/foo/bar")
 
     with pytest.raises(PyXSError):
-        c.read("/foo/bar")
+        c.read(b"/foo/bar")
 
-    try:
-        c.read("/foo/bar", "baz") == "baz"  # using a default option.
-    except PyXSError:
-        pytest.fail("No error should've been raised, got: {0}"
-                    .format(e))
+    c.read(b"/foo/bar", b"baz") == b"baz"  # using a default option.
 
-    assert c.read("/foo") == ""
+    assert c.read(b"/foo") == b""
 
 
 @virtualized
-def test_ls():
-    for backend in [UnixSocketConnection, XenBusConnection]:
-        c = Client(connection=backend())
-        c.mkdir("/foo/bar")
+@with_backend
+def test_ls(backend):
+    c = Client(connection=backend())
+    c.mkdir(b"/foo/bar")
 
-        # a) OK-case.
-        assert c.ls("/foo") == ["bar"]
-        assert c.ls("/foo/bar") == []
+    # a) OK-case.
+    assert c.ls(b"/foo") == [b"bar"]
+    assert c.ls(b"/foo/bar") == []
 
-        # b) directory doesn't exist.
-        try:
-            c.ls("/path/to/something")
-        except PyXSError as e:
-            assert e.args[0] == errno.ENOENT
+    # b) directory doesn't exist.
+    try:
+        c.ls(b"/path/to/something")
+    except PyXSError as e:
+        assert e.args[0] == errno.ENOENT
 
-        # c) No list permissions (should be ran in DomU)?
+    # c) No list permissions (should be ran in DomU)?
 
 
 @virtualized
 @with_backend
 def test_permissions(backend):
     c = Client(connection=backend())
-    c.rm("/foo")
-    c.mkdir("/foo/bar")
+    c.rm(b"/foo")
+    c.mkdir(b"/foo/bar")
 
     # a) checking default permissions -- full access.
-    assert c.get_permissions("/foo/bar") == ["n0"]
+    assert c.get_permissions(b"/foo/bar") == [b"n0"]
 
     # b) setting new permissions, and making sure it worked.
-    c.set_permissions("/foo/bar", ["b0"])
-    assert c.get_permissions("/foo/bar") == ["b0"]
+    c.set_permissions(b"/foo/bar", [b"b0"])
+    assert c.get_permissions(b"/foo/bar") == [b"b0"]
 
     # c) conflicting permissions -- XenStore doesn't care.
-    c.set_permissions("/foo/bar", ["b0", "n0", "r0"])
-    assert c.get_permissions("/foo/bar") == ["b0", "n0", "r0"]
+    c.set_permissions(b"/foo/bar", [b"b0", b"n0", b"r0"])
+    assert c.get_permissions(b"/foo/bar") == [b"b0", b"n0", b"r0"]
 
     # d) invalid permission format.
     with pytest.raises(InvalidPermission):
-        c.set_permissions("/foo/bar", ["x0"])
+        c.set_permissions(b"/foo/bar", [b"x0"])
 
 
 @virtualized
@@ -285,13 +261,13 @@ def test_get_domain_path(backend):
 
     # a) invalid domid.
     with pytest.raises(ValueError):
-        c.get_domain_path("foo")
+        c.get_domain_path(b"foo")
 
     # b) OK-case (note, that XenStored doesn't care if a domain
     #    actually exists, but according to the spec we shouldn't
     #    really count on a *valid* reply in that case).
-    assert c.get_domain_path(0) == "/local/domain/0"
-    assert c.get_domain_path(999) == "/local/domain/999"
+    assert c.get_domain_path(0) == b"/local/domain/0"
+    assert c.get_domain_path(999) == b"/local/domain/999"
 
 
 @virtualized
@@ -309,23 +285,23 @@ def test_is_domain_introduced(backend):
 @with_backend
 def test_watches(backend):
     c = Client(connection=backend())
-    c.write("/foo/bar", "baz")
+    c.write(b"/foo/bar", b"baz")
     m = c.monitor()
-    m.watch("/foo/bar", "boo")
+    m.watch(b"/foo/bar", b"boo")
 
     # a) we receive the first event immediately, so `wait()` doesn't
     #    block.
-    assert m.wait() == ("/foo/bar", "boo")
+    assert m.wait() == (b"/foo/bar", b"boo")
 
     # b) before the second call we have to make sure someone
     #    will change the path being watched.
-    Timer(.5, lambda: c.write("/foo/bar", "baz")).run()
-    assert m.wait() == ("/foo/bar", "boo")
+    Timer(.5, lambda: c.write(b"/foo/bar", b"baz")).run()
+    assert m.wait() == (b"/foo/bar", b"boo")
 
     # c) changing a children of the watched path triggers watch
     #    event as well.
-    Timer(.5, lambda: c.write("/foo/bar/baz", "???")).run()
-    assert m.wait() == ("/foo/bar/baz", "boo")
+    Timer(.5, lambda: c.write(b"/foo/bar/baz", b"???")).run()
+    assert m.wait() == (b"/foo/bar/baz", b"boo")
 
 
 @virtualized
@@ -335,10 +311,5 @@ def test_header_decode_error(backend):
 
     # a) The following packet's header cannot be decoded to UTF-8, but
     #    we still need to handle it somehow.
-    p = Packet(11, "/foo", rq_id=0, tx_id=128)
-
-    try:
-        c.connection.send(p)
-    except UnicodeDecodeError as e:
-        pytest.fail("No error should've been raised, got: {0}"
-                    .format(e))
+    p = Packet(11, b"/foo", rq_id=0, tx_id=128)
+    c.connection.send(p)

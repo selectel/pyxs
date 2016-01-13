@@ -9,10 +9,7 @@
     :license: LGPL, see LICENSE for more details.
 """
 
-from __future__ import unicode_literals
-
-__all__ = ["validate_path", "validate_watch_path", "validate_perms",
-           "error"]
+__all__ = ["validate_path", "validate_watch_path", "validate_perms", "error"]
 
 import errno
 import re
@@ -83,43 +80,29 @@ def error(smth):
     pyxs.exceptions.PyXSError: (22, 'Invalid argument')
     """
     if isinstance(smth, bytes):
-        smth = _codeerror.get(smth, 0)
+        smth = _codeerror.get(smth.decode("utf-8"), 0)
 
     return PyXSError(smth, os.strerror(smth))
-
-
-def force_unicode(value):
-    """Coerces a given value to :func:`unicode`.
-
-    >>> force_bytes(b"foo")
-    u'foo'
-    >>> force_bytes(None)
-    u'None'
-    """
-    if isinstance(value, bytes):
-        return value.decode("utf-8")
-    else:
-        return str(value)
 
 
 def validate_path(path):
     """Checks if a given path is valid, see
     :exc:`~pyxs.exceptions.InvalidPath` for details.
 
-    :param str path: path to check.
+    :param bytes path: path to check.
     :raises pyxs.exceptions.InvalidPath: when path fails to validate.
     """
     # Paths longer than 3072 bytes are forbidden; clients specifying
     # relative paths should keep them to within 2048 bytes.
     max_len = 3072 if posixpath.abspath(path) else 2048
 
-    if not (re.match("^[a-zA-Z0-9-/_@]+\x00?$", path) and
+    if not (re.match(b"^[a-zA-Z0-9-/_@]+\x00?$", path) and
             len(path) <= max_len):
         raise InvalidPath(path)
 
     # A path is not allowed to have a trailing /, except for the
-    # root path and shouldn't have dount //'s.
-    if (len(path) > 1 and path[-1] == "/") or "//" in path:
+    # root path and shouldn't have double //'s.
+    if (len(path) > 1 and path.endswith(b"/")) or b"//" in path:
         raise InvalidPath(path)
 
     return path
@@ -129,11 +112,11 @@ def validate_watch_path(wpath):
     """Checks if a given watch path is valid -- it should either be a
     valid path or a special, starting with ``@`` character.
 
-    :param str wpath: watch path to check.
+    :param bytes wpath: watch path to check.
     :raises pyxs.exceptions.InvalidPath: when path fails to validate.
     """
-    if (wpath.startswith("@") and
-            not re.match("^@(?:introduceDomain|releaseDomain)\x00?$", wpath)):
+    if (wpath.startswith(b"@") and
+            not re.match(b"^@(?:introduceDomain|releaseDomain)\x00?$", wpath)):
         raise InvalidPath(wpath)
     else:
         validate_path(wpath)
@@ -150,7 +133,7 @@ def validate_perms(perms):
         when any of the permissions fail to validate.
     """
     for perm in perms:
-        if not re.match("[wrbn]\d+", perm):
+        if not re.match(b"[wrbn]\d+", perm):
             raise InvalidPermission(perm)
 
     return perms
