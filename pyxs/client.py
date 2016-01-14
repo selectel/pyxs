@@ -347,7 +347,8 @@ class Client(object):
            it will allocate id 0 for an actual transaction.
         """
         payload = self.execute_command(Op.TRANSACTION_START, NUL)
-        return int(payload)
+        self.tx_id = int(payload)
+        return self.tx_id
 
     def transaction_end(self, commit=True):
         """End a transaction currently in progress.; if no transaction is

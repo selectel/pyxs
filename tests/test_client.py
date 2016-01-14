@@ -53,6 +53,8 @@ def test_client_context_manager():
 
     assert not c.connection.is_active
 
+@virtualized
+def test_transaction_context_manager():
     # b) transaction in progress -- expecting it to be commited on
     #    context manager exit.
     c = Client()
