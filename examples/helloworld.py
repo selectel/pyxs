@@ -53,9 +53,9 @@ def run(**kwargs):
         print(c.is_domain_introduced(0))
 
         # g) transactions.
-        with c.transaction() as t:
+        with c.transaction():
             print("Creating a `/bar/foo` within a transaction.")
-            t.write(b"/bar/foo", b"baz")
+            c.write(b"/bar/foo", b"baz")
 
         print("Transaction is over -- let's check it: "
               "/bar/foo =", c.read(b"/bar/foo"))

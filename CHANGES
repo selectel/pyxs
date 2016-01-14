@@ -12,6 +12,8 @@ Version 0.3.2
   paths and values are specfified to be 7-bit ASCII, thus it makes little
   sense to allow any Unicode string as input and then validate if it
   matches the spec.
+- Removed ``transaction`` argument from ``Client`` constructor. Please
+  use the corresponding context manager explicitly.
 
 Version 0.3.1
 -------------

@@ -20,11 +20,13 @@ __all__ = ["Client", "Monitor"]
 
 import copy
 import errno
+import posixpath
 import re
+import sys
 import threading
 import time
-import posixpath
 from collections import deque
+from contextlib import contextmanager
 
 from ._internal import NUL, Event, Packet, Op
 from .connection import UnixSocketConnection, XenBusConnection
@@ -47,9 +49,6 @@ class Client(object):
         as a backend.
     :param float socket_timeout: see :meth:`~socket.socket.settimeout`
                                  for details.
-    :param bool transaction: if ``True`` :meth:`transaction_start` will
-                             be issued right after connection is
-                             established.
 
     .. note:: :class:`~pyxs.connection.UnixSocketConnection` is used
               as a fallback value, if backend cannot be determined
@@ -84,7 +83,7 @@ class Client(object):
         SU = False
 
     def __init__(self, unix_socket_path=None, socket_timeout=None,
-                 xen_bus_path=None, connection=None, transaction=False):
+                 xen_bus_path=None, connection=None):
         if connection:
             self.connection = connection
         elif unix_socket_path or not xen_bus_path:
@@ -97,17 +96,14 @@ class Client(object):
         self.tx_lock = threading.Lock()
         self.events = deque()
 
-        if transaction:  # Obtain a transaction id.
-            self.tx_id = self.transaction_start()
-
     def __enter__(self):
         # TODO: move tx_id initialization here.
         self.connection.connect()
         return self
 
     def __exit__(self, *exc_info):
-        if not any(exc_info) and self.tx_id:
-            self.transaction_end(commit=True)
+        if self.tx_id:
+            self.transaction_end(commit=not any(exc_info))
 
         self.connection.disconnect()
 
@@ -354,7 +350,7 @@ class Client(object):
         return int(payload)
 
     def transaction_end(self, commit=True):
-        """End a transaction currently in progress; if no transaction is
+        """End a transaction currently in progress.; if no transaction is
         running no command is sent to XenStore.
         """
         if self.tx_id:
@@ -367,26 +363,33 @@ class Client(object):
         """
         return Monitor(connection=copy.copy(self.connection))
 
+    @contextmanager
     def transaction(self):
         """Returns a new :class:`Client` instance, operating within a
         new transaction; can only be used only when no transaction is
         running. Here's an example:
 
-        >>> with Client().transaction() as t:
-        ...     t.do_something()
-        ...     t.transaction_end(commit=True)
+        >>> with Client().transaction() as c:
+        ...     c.do_something()
+        ...     c.transaction_end(commit=True)
 
-        However, the last line is completely optional, since the default
-        behaviour is to commit everything on context manager exit.
+        The last line is completely optional, since the default behaviour
+        is to end the transaction on context manager exit.
 
-        :raises pyxs.exceptions.PyXSError: if this client is linked to
-                                           and active transaction.
+        :raises pyxs.exceptions.PyXSError: if this client is already
+                                           operating within a transaction.
+
+        .. note::
+
+           The transaction is committed only if there was no exception
+           in the ``with`` block.
         """
         if self.tx_id:
             raise error(errno.EALREADY)
 
-        return Client(connection=copy.copy(self.connection),
-                      transaction=True)
+        self.transaction_start()
+        yield self
+        self.transaction_end(commit=not any(sys.exc_info()))
 
 
 class Monitor(object):

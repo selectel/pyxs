@@ -43,15 +43,6 @@ virtualized = pytest.mark.skipif(
 
 
 @virtualized
-def test_client_transaction():
-    # Making sure ``tx_id`` is acquired if transaction argument is not
-    # ``False``.
-    c = Client(transaction=True)
-    assert c.connection.is_active
-    assert c.tx_id != 0
-
-
-@virtualized
 def test_client_context_manager():
     # a) no transaction is running
     c = Client()
@@ -64,8 +55,8 @@ def test_client_context_manager():
 
     # b) transaction in progress -- expecting it to be commited on
     #    context manager exit.
-    c = Client(transaction=True)
-    with c:
+    c = Client()
+    with c.transaction():
         assert c.tx_id != 0
 
     assert c.tx_id == 0
