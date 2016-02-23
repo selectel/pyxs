@@ -37,7 +37,7 @@ except ImportError:
 from ._internal import NUL, Event, Packet, Op
 from .connection import UnixSocketConnection, XenBusConnection
 from .exceptions import UnexpectedPacket, UnexpectedEvent, PyXSError
-from .helpers import validate_path, validate_watch_path, validate_perms, error
+from .helpers import check_path, check_watch_path, check_perms, error
 
 _re_7bit_ascii = re.compile(b"^[\x00\x20-\x7f]+$")
 
@@ -249,7 +249,7 @@ class Client(object):
         :param str default: default value, to be used if `path` doesn't
                             exist.
         """
-        validate_path(path)
+        check_path(path)
         try:
             return self.execute_command(Op.READ, path + NUL)
         except PyXSError as e:
@@ -266,7 +266,7 @@ class Client(object):
         :param bytes value: data to write.
         :param bytes path: a path to write to.
         """
-        validate_path(path)
+        check_path(path)
         self.ack(Op.WRITE, path + NUL, value)
 
     __setitem__ = write
@@ -278,7 +278,7 @@ class Client(object):
 
         :param bytes path: path to directory to create.
         """
-        validate_path(path)
+        check_path(path)
         self.ack(Op.MKDIR, path + NUL)
 
     def rm(self, path):
@@ -289,7 +289,7 @@ class Client(object):
 
         :param bytes path: path to directory to remove.
         """
-        validate_path(path)
+        check_path(path)
         self.ack(Op.RM, path + NUL)
 
     __delitem__ = rm
@@ -299,7 +299,7 @@ class Client(object):
 
         :param bytes path: path to list.
         """
-        validate_path(path)
+        check_path(path)
         payload = self.execute_command(Op.DIRECTORY, path + NUL)
         return [] if not payload else payload.split(NUL)
 
@@ -310,7 +310,7 @@ class Client(object):
 
         :param bytes path: path to get permissions for.
         """
-        validate_path(path)
+        check_path(path)
         payload = self.execute_command(Op.GET_PERMS, path + NUL)
         return payload.split(NUL)
 
@@ -322,8 +322,8 @@ class Client(object):
         :param bytes path: path to set permissions for.
         :param list perms: a list of permissions to set.
         """
-        validate_path(path)
-        validate_perms(perms)
+        check_path(path)
+        check_perms(perms)
         self.ack(Op.SET_PERMS, path + NUL, *(perm + NUL for perm in perms))
 
     def walk(self, top, topdown=True):
@@ -438,7 +438,7 @@ class Client(object):
 
         .. warning::
 
-           Currently ``xenstored`` has a bug that after 2^32 transactions
+           Currently ``xenstored`` has a bug that after 2**32 transactions
            it will allocate id 0 for an actual transaction.
         """
         payload = self.execute_command(Op.TRANSACTION_START, NUL)
@@ -531,7 +531,7 @@ class Monitor(object):
         :param bytes wpath: path to watch.
         :param bytes token: watch token, returned in watch notification.
         """
-        validate_watch_path(wpath)
+        check_watch_path(wpath)
         self.client.router.watch(token, self)
         self.client.ack(Op.WATCH, wpath + NUL, token + NUL)
         self.watched.add(wpath)
@@ -542,7 +542,7 @@ class Monitor(object):
         :param bytes wpath: path to unwatch.
         :param bytes token: watch token, passed to :meth:`watch`.
         """
-        validate_watch_path(wpath)
+        check_watch_path(wpath)
         self.client.ack(Op.UNWATCH, wpath + NUL, token + NUL)
         self.client.router.unwatch(token, self)
         self.watched.discard(wpath)

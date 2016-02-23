@@ -9,7 +9,7 @@
     :license: LGPL, see LICENSE for more details.
 """
 
-__all__ = ["validate_path", "validate_watch_path", "validate_perms", "error"]
+__all__ = ["check_path", "check_watch_path", "check_perms", "error"]
 
 import errno
 import re
@@ -72,7 +72,7 @@ def error(smth):
 _re_path = re.compile(b"^[a-zA-Z0-9-/_@]+\x00?$")
 
 
-def validate_path(path):
+def check_path(path):
     """Checks if a given path is valid, see
     :exc:`~pyxs.exceptions.InvalidPath` for details.
 
@@ -96,7 +96,7 @@ def validate_path(path):
 _re_watch_path = re.compile(b"^@(?:introduceDomain|releaseDomain)\x00?$")
 
 
-def validate_watch_path(wpath):
+def check_watch_path(wpath):
     """Checks if a given watch path is valid -- it should either be a
     valid path or a special, starting with ``@`` character.
 
@@ -106,7 +106,7 @@ def validate_watch_path(wpath):
     if wpath.startswith(b"@") and not _re_watch_path.match(wpath):
         raise InvalidPath(wpath)
     else:
-        validate_path(wpath)
+        check_path(wpath)
 
     return wpath
 
@@ -114,13 +114,13 @@ def validate_watch_path(wpath):
 _re_perms = re.compile(b"^[wrbn]\d+$")
 
 
-def validate_perms(perms):
+def check_perms(perms):
     """Checks if a given list of permision follows the format described
     in :exc:`~pyxs.exceptions.InvalidPermissions`.
 
     :param list perms: permissions to check.
     :raises pyxs.exceptions.InvalidPermissions:
-        when any of the permissions fail to validate.
+        when any of the permissions fails to validate.
     """
     for perm in perms:
         if not _re_perms.match(perm):
