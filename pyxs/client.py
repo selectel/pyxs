@@ -43,6 +43,10 @@ _re_7bit_ascii = re.compile(b"^[\x00\x20-\x7f]+$")
 
 
 class Router(object):
+    """Router is a ...
+
+    .. versionadded: 0.4.0
+    """
     def __init__(self, connection):
         # TODO: motivate this hack.
         self.r_terminator, self.w_terminator = socket.socketpair()
@@ -86,9 +90,8 @@ class Router(object):
 
     def send(self, packet):
         with self.send_lock:
-            # TODO: this might not work with 'XenBusConnection',
-            # for some reason it sometimes returns *random* values
-            # of tx_id and rq_id.
+            # The order here matters. XenStore might reply to the packet
+            # *before* the ``rvar`` is registered.
             self.rvars[packet.token] = rvar = RVar()
             self.connection.send(packet)
             return rvar
@@ -99,6 +102,10 @@ class Router(object):
 
 
 class RVar:
+    """A thread-safe shared mutable reference.
+
+    .. versionadded:: 0.4.0
+    """
     __slots__ = ["condition", "target"]
 
     def __init__(self):
@@ -106,6 +113,11 @@ class RVar:
         self.target = None
 
     def get(self):
+        """Blocks until the value is :meth:`~RVar.set`` and then returns
+        the value.
+
+        .. note:: The returned value is guaranteed never to be ``None``.
+        """
         with self.condition:
             while self.target is None:
                 self.condition.wait(timeout=1)
@@ -113,9 +125,12 @@ class RVar:
         return self.target
 
     def set(self, target):
+        """Sets the value effectively unblocking all :meth:`~RVar.get`
+        calls.
+        """
         with self.condition:
             self.target = target
-            self.condition.notify()
+            self.condition.notify_all()
 
 
 class Client(object):
@@ -177,13 +192,6 @@ class Client(object):
 
         self.close()
 
-    def connect(self):
-        self.router_thread.start()
-
-    def close(self):
-        self.router.terminate()
-        self.router_thread.join()
-
     # Private API.
     # ............
 
@@ -212,6 +220,27 @@ class Client(object):
 
     # Public API.
     # ...........
+
+    def connect(self):
+        """Connects to the XenStore daemon.
+
+        .. versionadded: 0.4.0
+
+        .. note:: This method is unsafe. Please use :class:`Client` as a
+                  context manager to make sure the client is properly
+                  finalized.
+        """
+        self.router_thread.start()
+
+    def close(self):
+        """Finalizes the client.
+
+        .. note:: This method is unsafe. Please use :class:`Client` as a
+                  context manager to make sure the client is properly
+                  finalized.
+        """
+        self.router.terminate()
+        self.router_thread.join()
 
     def read(self, path, default=None):
         """Reads data from a given path.
@@ -419,17 +448,21 @@ class Client(object):
     def transaction_end(self, commit=True):
         """End a transaction currently in progress.
 
-        If no transaction is running no command is sent to XenStore.
+        .. versionchanged: 0.4.0
+
+           In previous versions the method gracefully handled attempts to
+           end a transaction when no transaction was running. This is no
+           longer the case. The method will send the corresponding command
+           to XenStore.
         """
-        if self.tx_id:
-            self.ack(Op.TRANSACTION_END, b"FT"[commit] + NUL)
-            self.tx_id = 0
+        self.ack(Op.TRANSACTION_END, b"FT"[commit] + NUL)
+        self.tx_id = 0
 
     def monitor(self):
         """Returns a new :class:`Monitor` instance, which is currently
         *the only way* of doing PUBSUB.
 
-        TODO: clarify the lifetime of connection.
+        TODO: note on the router lifetime.
         """
         return Monitor(copy.copy(self))
 
@@ -469,9 +502,10 @@ class Monitor(object):
     """XenStore monitor -- allows minimal PUBSUB-like functionality
     on top of XenStore.
 
-    >>> m = Client().monitor()
-    >>> m.watch("foo/bar")
-    >>> m.wait()
+    >>> with Client() as c:
+    ...    with c.monitor():
+    ...       c.watch("foo/bar")
+    ...       print(next(c.wait()))
     Event(...)
     """
     def __init__(self, client):
@@ -489,10 +523,10 @@ class Monitor(object):
     def watch(self, wpath, token):
         """Adds a watch.
 
-        When a `path` is modified (including path creation, removal,
-        contents change or permissions change) this generates an event
-        on the changed `path`. Changes made in transactions cause an
-        event only if and when committed.
+        Any alteration to the watched path generates an event. This
+        includes path creation, removal, contents change or permission
+        change. Changes made in transactions cause an event only if
+        and when committed.
 
         :param bytes wpath: path to watch.
         :param bytes token: watch token, returned in watch notification.
