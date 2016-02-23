@@ -18,10 +18,6 @@ import errno
 import os
 import platform
 import socket
-import sys
-
-if sys.version_info[0] is not 3:
-    bytes, str = str, unicode
 
 from .exceptions import ConnectionError
 from .helpers import writeall, readall
@@ -45,6 +41,9 @@ class FileDescriptorConnection(object):
     def is_active(self):
         return self.fd is not None
 
+    def fileno(self):
+        return self.fd
+
     def disconnect(self, silent=True):
         """Disconnects from XenStore.
 
@@ -61,7 +60,7 @@ class FileDescriptorConnection(object):
             if not silent:
                 raise ConnectionError(e.args)
         finally:
-            self.fd = None
+            self.fd = self.path = None
 
     def send(self, packet):
         """Sends a given packet to XenStore.
@@ -119,10 +118,8 @@ class UnixSocketConnection(FileDescriptorConnection):
     :param str path: path to XenStore unix domain socket, if not
                      provided explicitly is restored from process
                      environment -- similar to what ``libxs`` does.
-    :param float socket_timeout: see :func:`~socket.socket.settimeout`
-                                 for details.
     """
-    def __init__(self, path=None, socket_timeout=None):
+    def __init__(self, path=None):
         if path is None:
             path = (
                 os.getenv("XENSTORED_PATH") or
@@ -131,10 +128,6 @@ class UnixSocketConnection(FileDescriptorConnection):
             )
 
         self.path = path
-        self.socket_timeout = socket_timeout
-
-    def __copy__(self):
-        return self.__class__(self.path, self.socket_timeout)
 
     def connect(self):
         if self.is_active:
@@ -142,14 +135,13 @@ class UnixSocketConnection(FileDescriptorConnection):
 
         try:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            if self.socket_timeout is not None:
-                sock.settimeout(self.socket_timeout)
             sock.connect(self.path)
         except socket.error as e:
             raise ConnectionError("Error connecting to {0!r}: {1}"
                                   .format(self.path, e.args))
         else:
             self.fd = os.dup(sock.fileno())
+
 
 class XenBusConnection(FileDescriptorConnection):
     """XenStore connection through XenBus.
@@ -174,9 +166,6 @@ class XenBusConnection(FileDescriptorConnection):
                 path = "/dev/xen/xenbus"
 
         self.path = path
-
-    def __copy__(self):
-        return self.__class__(self.path)
 
     def connect(self):
         if self.is_active:

@@ -22,23 +22,114 @@ import copy
 import errno
 import posixpath
 import re
+import select
 import sys
 import threading
-import time
-from collections import deque
+from collections import defaultdict
 from contextlib import contextmanager
+
+try:
+    import Queue as queue
+except ImportError:
+    import queue
 
 from ._internal import NUL, Event, Packet, Op
 from .connection import UnixSocketConnection, XenBusConnection
-from .exceptions import UnexpectedPacket, PyXSError
+from .exceptions import UnexpectedPacket, UnexpectedEvent, PyXSError
 from .helpers import validate_path, validate_watch_path, validate_perms, \
     dict_merge, error
 
 _re_7bit_ascii = re.compile(b"^[\x00\x20-\x7f]+$")
 
 
+class Router(object):
+    def __init__(self, connection):
+        self.is_terminated = False
+        self.connection = connection
+        self.send_lock = threading.Lock()
+        self.rvars = {}
+        self.monitors = defaultdict(list)
+
+    def __call__(self):
+        self.connection.connect()
+        try:
+            while not self.is_terminated:
+                rlist, _wlist, xlist = select.select(
+                    [self.connection], [], [], 1)
+                if not rlist:
+                    assert not xlist
+                    continue
+
+                packet = self.connection.recv()
+                if packet.op is Op.WATCH_EVENT:
+                    event = Event(*packet.payload.split(NUL)[:-1])
+                    for monitor in self.monitors[event.token]:
+                        monitor.events.put(event)
+                else:
+                    token = packet.token
+                    if token in self.rvars:
+                        self.rvars[token].set(packet)
+                    else:
+                        raise UnexpectedPacket(packet)
+        finally:
+            self.connection.disconnect()
+
+    def watch(self, token, monitor):
+        self.monitors[token].append(monitor)
+
+    def unwatch(self, token, monitor):
+        self.monitors[token].remove(monitor)
+
+    def send(self, packet):
+        with self.send_lock:
+            # TODO: this might not work with 'XenBusConnection',
+            # for some reason it sometimes returns *random* values
+            # of tx_id and rq_id.
+            self.rvars[packet.token] = rvar = RVar()
+            self.connection.send(packet)
+            return rvar
+
+    def terminate(self):
+        self.is_terminated = True
+        self.connection.disconnect()
+
+
+class RVar:
+    __slots__ = ["condition", "target"]
+
+    def __init__(self):
+        self.condition = threading.Condition()
+        self.target = None
+
+    def get(self):
+        with self.condition:
+            while self.target is None:
+                self.condition.wait(timeout=1)
+
+        return self.target
+
+    def set(self, target):
+        with self.condition:
+            self.target = target
+            self.condition.notify()
+
+
+COMMAND_VALIDATORS = dict_merge(
+    dict.fromkeys([Op.READ, Op.MKDIR, Op.RM, Op.DIRECTORY, Op.GET_PERMS],
+                  validate_path),
+    dict.fromkeys([Op.WRITE], lambda p, v: validate_path(p)),
+    dict.fromkeys([Op.SET_PERMS],
+        lambda p, *perms: validate_path(p) and validate_perms(perms)),
+    dict.fromkeys([Op.GET_DOMAIN_PATH, Op.IS_DOMAIN_INTRODUCED,
+                   Op.INTRODUCE, Op.RELEASE, Op.SET_TARGET],
+        lambda *domids: all(d[:-1].isdigit() for d in domids)),
+    dict.fromkeys([Op.WATCH, Op.UNWATCH],
+        lambda p, t: validate_path(p) and validate_watch_path(p))
+)
+
+
 class Client(object):
-    """XenStore client -- <useful comment>.
+    """XenStore client -- TODO: <useful comment>.
 
     :param str xen_bus_path: path to XenBus device, implies that
                              :class:`~pyxs.connection.XenBusConnection`
@@ -47,8 +138,6 @@ class Client(object):
         usually something like ``/var/run/xenstored/socket`` -- implies
         that :class:`~pyxs.connection.UnixSocketConnection` is used
         as a backend.
-    :param float socket_timeout: see :meth:`~socket.socket.settimeout`
-                                 for details.
 
     .. note:: :class:`~pyxs.connection.UnixSocketConnection` is used
               as a fallback value, if backend cannot be determined
@@ -57,24 +146,10 @@ class Client(object):
     Here's a quick example:
 
     >>> with Client() as c:
-    ...     c.write("/foo/bar", "baz")
-    ...     c.read("/foo/bar")
-    'OK'
-    'baz'
+    ...     c.write(b"/foo/bar", b"baz")
+    ...     print(c.read(b"/foo/bar"))
+    b'baz'
     """
-    COMMAND_VALIDATORS = dict_merge(
-        dict.fromkeys([Op.READ, Op.MKDIR, Op.RM, Op.DIRECTORY, Op.GET_PERMS],
-                      validate_path),
-        dict.fromkeys([Op.WRITE], lambda p, v: validate_path(p)),
-        dict.fromkeys([Op.SET_PERMS],
-            lambda p, *perms: validate_path(p) and validate_perms(perms)),
-        dict.fromkeys([Op.GET_DOMAIN_PATH, Op.IS_DOMAIN_INTRODUCED,
-                       Op.INTRODUCE, Op.RELEASE, Op.SET_TARGET],
-            lambda *domids: all(d[:-1].isdigit() for d in domids)),
-        dict.fromkeys([Op.WATCH, Op.UNWATCH],
-            lambda p, t: validate_path(p) and validate_watch_path(p))
-    )
-
     #: A flag, which is ``True`` if we're operating on control domain
     #: and else otherwise.
     try:
@@ -82,69 +157,64 @@ class Client(object):
     except (IOError, OSError):
         SU = False
 
-    def __init__(self, unix_socket_path=None, socket_timeout=None,
-                 xen_bus_path=None, connection=None):
-        if connection:
-            self.connection = connection
-        elif unix_socket_path or not xen_bus_path:
-            self.connection = UnixSocketConnection(
-                unix_socket_path, socket_timeout=socket_timeout)
-        else:
-            self.connection = XenBusConnection(xen_bus_path)
+    def __init__(self, unix_socket_path=None, xen_bus_path=None,
+                 router=None, router_thread=None):
+        if router is None:
+            if unix_socket_path or not xen_bus_path:
+                connection = UnixSocketConnection(unix_socket_path)
+            else:
+                connection = XenBusConnection(xen_bus_path)
 
+            router = Router(connection)
+
+        self.router = router
+        self.router_thread = router_thread or threading.Thread(target=router)
+        self.rq_id = 0
         self.tx_id = 0
-        self.tx_lock = threading.Lock()
-        self.events = deque()
+
+    def __copy__(self):
+        return self.__class__(router=self.router,
+                              router_thread=self.router_thread)
 
     def __enter__(self):
-        # TODO: move tx_id initialization here.
-        self.connection.connect()
+        self.connect()
         return self
 
     def __exit__(self, *exc_info):
+        # TODO: forbid uncommitted transactions.
         if self.tx_id:
             self.transaction_end(commit=not any(exc_info))
 
-        self.connection.disconnect()
+        self.close()
+
+    def connect(self):
+        self.router_thread.start()
+
+    def close(self):
+        self.router.terminate()
+        self.router_thread.join()
 
     # Private API.
     # ............
 
     def execute_command(self, op, *args, **kwargs):
-        if not self.COMMAND_VALIDATORS.get(op, lambda *args: True)(*args):
+        if not COMMAND_VALIDATORS.get(op, lambda *args: True)(*args):
             raise ValueError(args)
         elif not all(map(_re_7bit_ascii.match, args)):
             raise ValueError(args)
 
-        with self.tx_lock:
-            kwargs["tx_id"] = self.tx_id  # Forcing ``tx_id`` here.
-            self.connection.send(Packet(op, b"".join(args), **kwargs))
+        rq_id = self.rq_id
+        self.rq_id += 1
 
-            # If we have any watched paths XenStore will send watch
-            # events mixed with replies to other operations, so we loop
-            # until we recieve a packet with an expected operation type.
-            while True:
-                packet = self.connection.recv()
-
-                # According to ``xenstore.txt`` erroneous responses start
-                # with a capital E and end with ``NUL``-byte.
-                if packet.op is Op.ERROR:
-                    raise error(packet.payload[:-1])
-                # Incoming packet should either be a watch event or have
-                # the same operation type as the packet sent.
-                elif packet.op is Op.WATCH_EVENT:
-                    self.events.append(packet)
-                elif packet.op is not op:
-                    raise UnexpectedPacket(packet)
-                # Making sure sent and recieved packets are within the
-                # same transaction -- not relevant for `XenBusConnection`,
-                # for some reason it sometimes returns *random* values
-                # of tx_id and rq_id.
-                elif (not isinstance(self.connection, XenBusConnection) and
-                      packet.tx_id != self.tx_id):
-                    raise UnexpectedPacket(packet)
-                else:
-                    break
+        kwargs.update(tx_id=self.tx_id, rq_id=rq_id)
+        rvar = self.router.send(Packet(op, b"".join(args), **kwargs))
+        packet = rvar.get()
+        if packet.op is Op.ERROR:
+            # Erroneous responses are POSIX error code ending with a
+            # ``NUL`` byte.
+            raise error(packet.payload[:-1])
+        elif packet.op is not op:
+            raise UnexpectedPacket(packet)
 
         return packet.payload.rstrip(NUL)
 
@@ -361,8 +431,10 @@ class Client(object):
     def monitor(self):
         """Returns a new :class:`Monitor` instance, which is currently
         *the only way* of doing PUBSUB.
+
+        TODO: clarify the lifetime of connection.
         """
-        return Monitor(connection=copy.copy(self.connection))
+        return Monitor(copy.copy(self))
 
     @contextmanager
     def transaction(self):
@@ -370,9 +442,10 @@ class Client(object):
         new transaction; can only be used only when no transaction is
         running. Here's an example:
 
-        >>> with Client().transaction() as c:
-        ...     c.do_something()
-        ...     c.transaction_end(commit=True)
+        >>> with Client() as c:
+        ...     with c.transaction():
+        ...         c.do_something()
+        ...         c.transaction_end(commit=True)
 
         The last line is completely optional, since the default behaviour
         is to end the transaction on context manager exit.
@@ -384,12 +457,14 @@ class Client(object):
 
            The transaction is committed only if there was no exception
            in the ``with`` block.
+
+        TODO: make a decorator.
         """
         if self.tx_id:
             raise error(errno.EALREADY)
 
         self.transaction_start()
-        yield self
+        yield
         self.transaction_end(commit=not any(sys.exc_info()))
 
 
@@ -402,16 +477,16 @@ class Monitor(object):
     >>> m.wait()
     Event(...)
     """
-
-    def __init__(self, connection):
-        self.client = Client(connection=connection)
+    def __init__(self, client):
+        self.client = client
+        self.events = queue.Queue()
+        self.watched = set()
 
     def __enter__(self):
-        self.client.__enter__()
         return self
 
     def __exit__(self, *exc_info):
-        self.client.__exit__(*exc_info)
+        self.events.join()  # ?
 
     def watch(self, wpath, token):
         """Adds a watch.
@@ -424,7 +499,9 @@ class Monitor(object):
         :param bytes wpath: path to watch.
         :param bytes token: watch token, returned in watch notification.
         """
+        self.client.router.watch(token, self)
         self.client.ack(Op.WATCH, wpath + NUL, token + NUL)
+        self.watched.add(wpath)
 
     def unwatch(self, wpath, token):
         """Removes a previously added watch.
@@ -433,25 +510,33 @@ class Monitor(object):
         :param bytes token: watch token, passed to :meth:`watch`.
         """
         self.client.ack(Op.UNWATCH, wpath + NUL, token + NUL)
+        self.client.router.unwatch(token, self)
+        self.watched.discard(wpath)
 
-    def wait(self, sleep=None):
-        """Waits for any of the watched paths to generate an event,
-        which is a ``(path, token)`` pair, where the first element
-        is event path, i.e. the actual path that was modified and
-        second element is a token, passed to the :meth:`watch`.
+        # TODO: remove from the queue?
 
-        :param float sleep: number of seconds to sleep between event
-                            checks.
+    def wait(self):
+        """Yields events for all of the watched paths.
+
+        An event is a ``(path, token)`` pair, where the first element
+        is event path, i.e. the actual path that was modified, and the
+        second -- a token, passed to :meth:`watch`.
         """
         while True:
-            if self.client.events:
-                packet = self.client.events.popleft()
-                return Event(*packet.payload.split(b"\x00")[:-1])
+            # XXX unbounded waiting on a 'Condition' cannot be interrupted
+            #     Python2.X. Thus we're forced to do a timed wait. See
+            #     https://bugs.python.org/issue8844 for details.
+            try:
+                event = self.events.get(timeout=1)
+            except queue.Empty:
+                continue
 
-            # Executing a noop, hopefuly we'll get some events queued
-            # in the meantime. Note: I know it sucks, but it seems like
-            # there's no other way ...
-            self.client.execute_command(Op.DEBUG, NUL)
+            path = event.path
+            while path and path not in self.watched:
+                path = posixpath.dirname(path)
 
-            if sleep is not None:
-                time.sleep(sleep)
+            if not path:
+                # TODO: drop?
+                raise UnexpectedEvent(event)
+            else:
+                yield event
