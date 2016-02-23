@@ -22,6 +22,7 @@ import copy
 import errno
 import posixpath
 import re
+import socket
 import select
 import sys
 import threading
@@ -43,7 +44,8 @@ _re_7bit_ascii = re.compile(b"^[\x00\x20-\x7f]+$")
 
 class Router(object):
     def __init__(self, connection):
-        self.is_terminated = False
+        # TODO: motivate this hack.
+        self.r_terminator, self.w_terminator = socket.socketpair()
         self.connection = connection
         self.send_lock = threading.Lock()
         self.rvars = {}
@@ -52,12 +54,13 @@ class Router(object):
     def __call__(self):
         self.connection.connect()
         try:
-            while not self.is_terminated:
-                rlist, _wlist, xlist = select.select(
-                    [self.connection], [], [], 1)
+            while True:
+                rlist, _wlist, _xlist = select.select(
+                    [self.connection, self.r_terminator], [], [])
                 if not rlist:
-                    assert not xlist
                     continue
+                elif self.r_terminator in rlist:
+                    break
 
                 packet = self.connection.recv()
                 if packet.op is Op.WATCH_EVENT:
@@ -71,6 +74,8 @@ class Router(object):
                     else:
                         raise UnexpectedPacket(packet)
         finally:
+            self.r_terminator.close()
+            self.w_terminator.close()
             self.connection.disconnect()
 
     def watch(self, token, monitor):
@@ -89,7 +94,7 @@ class Router(object):
             return rvar
 
     def terminate(self):
-        self.is_terminated = True
+        self.w_terminator.sendall(NUL)
         self.connection.disconnect()
 
 
@@ -478,7 +483,8 @@ class Monitor(object):
         return self
 
     def __exit__(self, *exc_info):
-        self.events.join()  # ?
+        if not any(exc_info):
+            self.events.join()
 
     def watch(self, wpath, token):
         """Adds a watch.
