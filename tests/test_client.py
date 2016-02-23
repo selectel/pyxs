@@ -5,7 +5,7 @@ from threading import Timer
 
 import pytest
 
-from pyxs.client import Router, Client, COMMAND_VALIDATORS
+from pyxs.client import Router, Client
 from pyxs.connection import UnixSocketConnection, XenBusConnection
 from pyxs.exceptions import InvalidPayload, InvalidPermission, \
     UnexpectedPacket, PyXSError
@@ -252,13 +252,9 @@ def test_permissions(backend):
 @with_backend
 def test_get_domain_path(backend):
     with Client(router=Router(backend())) as c:
-        # a) invalid domid.
-        with pytest.raises(ValueError):
-            c.get_domain_path(b"foo")
-
-        # b) OK-case (note, that XenStored doesn't care if a domain
-        #    actually exists, but according to the spec we shouldn't
-        #    really count on a *valid* reply in that case).
+        # Note, that XenStored doesn't care if a domain exists, but
+        # according to the spec we shouldn't really count on a *valid*
+        # reply in that case.
         assert c.get_domain_path(0) == b"/local/domain/0"
         assert c.get_domain_path(999) == b"/local/domain/999"
 

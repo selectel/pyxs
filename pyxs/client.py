@@ -36,8 +36,7 @@ except ImportError:
 from ._internal import NUL, Event, Packet, Op
 from .connection import UnixSocketConnection, XenBusConnection
 from .exceptions import UnexpectedPacket, UnexpectedEvent, PyXSError
-from .helpers import validate_path, validate_watch_path, validate_perms, \
-    dict_merge, error
+from .helpers import validate_path, validate_watch_path, validate_perms, error
 
 _re_7bit_ascii = re.compile(b"^[\x00\x20-\x7f]+$")
 
@@ -114,20 +113,6 @@ class RVar:
             self.condition.notify()
 
 
-COMMAND_VALIDATORS = dict_merge(
-    dict.fromkeys([Op.READ, Op.MKDIR, Op.RM, Op.DIRECTORY, Op.GET_PERMS],
-                  validate_path),
-    dict.fromkeys([Op.WRITE], lambda p, v: validate_path(p)),
-    dict.fromkeys([Op.SET_PERMS],
-        lambda p, *perms: validate_path(p) and validate_perms(perms)),
-    dict.fromkeys([Op.GET_DOMAIN_PATH, Op.IS_DOMAIN_INTRODUCED,
-                   Op.INTRODUCE, Op.RELEASE, Op.SET_TARGET],
-        lambda *domids: all(d[:-1].isdigit() for d in domids)),
-    dict.fromkeys([Op.WATCH, Op.UNWATCH],
-        lambda p, t: validate_path(p) and validate_watch_path(p))
-)
-
-
 class Client(object):
     """XenStore client -- TODO: <useful comment>.
 
@@ -198,9 +183,7 @@ class Client(object):
     # ............
 
     def execute_command(self, op, *args, **kwargs):
-        if not COMMAND_VALIDATORS.get(op, lambda *args: True)(*args):
-            raise ValueError(args)
-        elif not all(map(_re_7bit_ascii.match, args)):
+        if not all(map(_re_7bit_ascii.match, args)):
             raise ValueError(args)
 
         rq_id = self.rq_id
@@ -232,6 +215,7 @@ class Client(object):
         :param str default: default value, to be used if `path` doesn't
                             exist.
         """
+        validate_path(path)
         try:
             return self.execute_command(Op.READ, path + NUL)
         except PyXSError as e:
@@ -248,6 +232,7 @@ class Client(object):
         :param bytes value: data to write.
         :param bytes path: a path to write to.
         """
+        validate_path(path)
         self.ack(Op.WRITE, path + NUL, value)
 
     __setitem__ = write
@@ -259,6 +244,7 @@ class Client(object):
 
         :param bytes path: path to directory to create.
         """
+        validate_path(path)
         self.ack(Op.MKDIR, path + NUL)
 
     def rm(self, path):
@@ -269,6 +255,7 @@ class Client(object):
 
         :param bytes path: path to directory to remove.
         """
+        validate_path(path)
         self.ack(Op.RM, path + NUL)
 
     __delitem__ = rm
@@ -278,6 +265,7 @@ class Client(object):
 
         :param bytes path: path to list.
         """
+        validate_path(path)
         payload = self.execute_command(Op.DIRECTORY, path + NUL)
         return [] if not payload else payload.split(NUL)
 
@@ -288,6 +276,7 @@ class Client(object):
 
         :param bytes path: path to get permissions for.
         """
+        validate_path(path)
         payload = self.execute_command(Op.GET_PERMS, path + NUL)
         return payload.split(NUL)
 
@@ -299,6 +288,8 @@ class Client(object):
         :param bytes path: path to set permissions for.
         :param list perms: a list of permissions to set.
         """
+        validate_path(path)
+        validate_perms(perms)
         self.ack(Op.SET_PERMS, path + NUL, *(perm + NUL for perm in perms))
 
     def walk(self, top, topdown=True):
@@ -421,8 +412,9 @@ class Client(object):
         return self.tx_id
 
     def transaction_end(self, commit=True):
-        """End a transaction currently in progress.; if no transaction is
-        running no command is sent to XenStore.
+        """End a transaction currently in progress.
+
+        If no transaction is running no command is sent to XenStore.
         """
         if self.tx_id:
             self.ack(Op.TRANSACTION_END, b"FT"[commit] + NUL)
@@ -499,6 +491,7 @@ class Monitor(object):
         :param bytes wpath: path to watch.
         :param bytes token: watch token, returned in watch notification.
         """
+        validate_watch_path(wpath)
         self.client.router.watch(token, self)
         self.client.ack(Op.WATCH, wpath + NUL, token + NUL)
         self.watched.add(wpath)
@@ -509,6 +502,7 @@ class Monitor(object):
         :param bytes wpath: path to unwatch.
         :param bytes token: watch token, passed to :meth:`watch`.
         """
+        validate_watch_path(wpath)
         self.client.ack(Op.UNWATCH, wpath + NUL, token + NUL)
         self.client.router.unwatch(token, self)
         self.watched.discard(wpath)

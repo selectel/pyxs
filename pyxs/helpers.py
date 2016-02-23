@@ -54,22 +54,6 @@ def readall(fd, length):
         return b"".join(chunks)
 
 
-def dict_merge(*dicts):
-    """Merges given dicts to a single one.
-
-    >>> dict_merge()
-    {}
-    >>> dict_merge({"foo": "bar", "baz": "boo"})
-    {'foo': 'bar', 'baz': 'boo'}
-    """
-    base = {}
-
-    for d in dicts:
-        base.update(d)
-    else:
-        return base
-
-
 def error(smth):
     """Returns a :class:`~pyxs.exceptions.PyXSError` matching a given
     errno or error name.
@@ -127,12 +111,12 @@ def validate_watch_path(wpath):
     return wpath
 
 
-_re_perms = re.compile(b"[wrbn]\d+")
+_re_perms = re.compile(b"^[wrbn]\d+$")
 
 
 def validate_perms(perms):
     """Checks if a given list of permision follows the format described
-    in :meth:`~pyxs.client.Client.get_permissions`.
+    in :exc:`~pyxs.exceptions.InvalidPermissions`.
 
     :param list perms: permissions to check.
     :raises pyxs.exceptions.InvalidPermissions:
