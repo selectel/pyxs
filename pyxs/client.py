@@ -448,6 +448,9 @@ class Client(object):
     def transaction_end(self, commit=True):
         """End a transaction currently in progress.
 
+        :raises pyxs.exceptions.PyXSError: with ``EAGAIN`` error code if
+                                           there were intervening writes.
+
         .. versionchanged: 0.4.0
 
            In previous versions the method gracefully handled attempts to
