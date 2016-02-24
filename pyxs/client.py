@@ -619,14 +619,12 @@ class Monitor(object):
         second -- a token, passed to :meth:`watch`.
         """
         while True:
-            # XXX unbounded waiting on a 'Condition' cannot be interrupted
-            #     Python2.X. Thus we're forced to do a timed wait. See
-            #     https://bugs.python.org/issue8844 for details.
-            try:
-                event = self.events.get(timeout=1)
-            except queue.Empty:
-                continue
+            with self.events.not_empty:
+                _condition_wait(self.events.not_empty)
 
+            event = self.events.get_nowait()
+
+            # Check that event path or its parent is watched.
             path = event.path
             while path and path not in self.watched:
                 path = posixpath.dirname(path)
