@@ -558,18 +558,22 @@ class Client(object):
 
 
 class Monitor(object):
-    """XenStore monitor -- allows minimal PUBSUB-like functionality
-    on top of XenStore.
+    """Monitor implements minimal PUBSUB functionality on top of XenStore.
 
     >>> with Client() as c:
-    ...    with c.monitor():
-    ...       c.watch("foo/bar")
-    ...       print(next(c.wait()))
+    ...    m = c.monitor():
+    ...    m.watch("foo/bar")
+    ...    print(next(c.wait()))
     Event(...)
 
     :param Client client: a reference to the parent client.
     :ivar dict watched: a mapping of path currently watched by the monitor
                         to the corresponding tokens.
+
+    .. note::
+
+       When used as a context manager the monitor will try to unwatch
+       all watched paths.
     """
     def __init__(self, client):
         self.client = client
@@ -580,8 +584,8 @@ class Monitor(object):
         return self
 
     def __exit__(self, *exc_info):
-        if not any(exc_info):
-            self.events.join()
+        for wpath, token in self.watched.items():
+            self.unwatch(wpath, token)
 
     def watch(self, wpath, token):
         """Adds a watch.
