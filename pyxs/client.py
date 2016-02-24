@@ -40,7 +40,7 @@ else:
 
 from ._internal import NUL, Event, Packet, Op, next_rq_id
 from .connection import UnixSocketConnection, XenBusConnection
-from .exceptions import UnexpectedPacket, UnexpectedEvent, PyXSError
+from .exceptions import UnexpectedPacket, PyXSError
 from .helpers import check_path, check_watch_path, check_perms, error
 
 _re_7bit_ascii = re.compile(b"^[\x00\x20-\x7f]+$")
