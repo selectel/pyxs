@@ -37,9 +37,23 @@ class FileDescriptorConnection(object):
         raise NotImplementedError(
             "__init__() should be overridden by subclasses.")
 
+    def __repr__(self):
+        if self.is_closed:
+            status = "closed"
+        elif self.is_active:
+            status = "connected"
+        else:
+            status = "initial"
+
+        return "{0}({1})".format(self.__class__.__name__, self.path, status)
+
     @property
     def is_active(self):
         return self.fd is not None
+
+    @property
+    def is_closed(self):
+        return self.path is None
 
     def fileno(self):
         return self.fd

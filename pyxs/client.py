@@ -85,6 +85,9 @@ class Router(object):
         self.rvars = {}
         self.monitors = defaultdict(list)
 
+    def __repr__(self):
+        return "Router({0})".format(self.connection)
+
     def __call__(self):
         self.connection.connect()
         try:
@@ -163,7 +166,7 @@ class RVar:
         self.target = None
 
     def __repr__(self):
-        return "RVar(target={})".format(None)
+        return "RVar({0})".format(self.target)
 
     def get(self):
         """Blocks until the value is :meth:`RVar.set`` and then returns
