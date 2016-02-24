@@ -5,10 +5,7 @@
 
     This module implements XenStore client, which uses multiple connection
     options for communication: :class:`.connection.UnixSocketConnection`
-    and :class:`.connection.XenBusConnection`. Note however, that the
-    latter one can be a bit buggy, when dealing with ``WATCH_EVENT``
-    packets, so using :class:`.connection.UnixSocketConnection` is
-    preferable.
+    and :class:`.connection.XenBusConnection`.
 
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
     :license: LGPL, see LICENSE for more details.
@@ -16,7 +13,7 @@
 
 from __future__ import absolute_import
 
-__all__ = ["Client", "Monitor"]
+__all__ = ["Router", "Client", "Monitor"]
 
 import copy
 import errno
@@ -28,11 +25,18 @@ import sys
 import threading
 from collections import defaultdict
 from contextlib import contextmanager
+from functools import partial
 
 try:
     import Queue as queue
 except ImportError:
     import queue
+
+# XXX see ``Router`` docstring for motivation.
+if sys.version_info[:2] < (3, 2):
+    _condition_wait = partial(threading._Condition.wait, timeout=1)
+else:
+    _condition_wait = threading.Condition.wait
 
 from ._internal import NUL, Event, Packet, Op
 from .connection import UnixSocketConnection, XenBusConnection
@@ -43,12 +47,38 @@ _re_7bit_ascii = re.compile(b"^[\x00\x20-\x7f]+$")
 
 
 class Router(object):
-    """Router is a ...
+    """Router.
+
+    The goal of the router is to multiplex XenStore connection between
+    multiple clients and monitors.
 
     .. versionadded: 0.4.0
+
+    :param connection FileDescriptorConnection:
+        owned by the router. The connection is open when the router is
+        started and remains open until the router is terminated.
+
+    .. note::
+
+       Python lacks API for interrupting a thread from another thread.
+       This means that when a router is in the :func:`select.select` or
+       :meth:`~threading.Condition.wait` call in cannot be stopped.
+
+       The following two "hacks" are used to ensure prompt termination.
+
+       1. A router is equipped with a :func:`socket.socketpair`. The
+          reader-end of the pair is selected in the mainloop alongside
+          the XenStore connection, while the writer-end is used in
+          :meth:`Router.terminate` to force-stop the mainloop.
+       2. All operations with :class:`threading.Condition` variables user
+          a 1 second timeout. This "hack" is only relevant for Python
+          prior to 3.2 which didn't allow to interrupt lock acquisitions.
+          See `issue8844`_ on CPython issue tracker for details. On
+          Python 3.2 and later no timeout is used.
+
+        .. _issue8844: https://bugs.python.org/issue8844
     """
     def __init__(self, connection):
-        # TODO: motivate this hack.
         self.r_terminator, self.w_terminator = socket.socketpair()
         self.connection = connection
         self.send_lock = threading.Lock()
@@ -84,15 +114,24 @@ class Router(object):
 
     @property
     def is_active(self):
+        """Returns ``True`` if the underlying connection is active and
+        ``False`` otherwise.
+        """
         return self.connection.is_active
 
-    def watch(self, token, monitor):
+    def subscribe(self, token, monitor):
+        """Subscribes a ``monitor`` to events with a given ``token``."""
         self.monitors[token].append(monitor)
 
-    def unwatch(self, token, monitor):
+    def unsubscribe(self, token, monitor):
+        """Unsubscribes a ``monitor`` to events with a given ``token``."""
         self.monitors[token].remove(monitor)
 
     def send(self, packet):
+        """Sends a packet to XenStore.
+
+        :returns RVar: a reference to the XenStore response.
+        """
         with self.send_lock:
             # The order here matters. XenStore might reply to the packet
             # *before* the ``rvar`` is registered.
@@ -101,6 +140,11 @@ class Router(object):
             return rvar
 
     def terminate(self):
+        """Terminates the router.
+
+        After termination the router can no longer send or receive packets.
+        Does nothing if the router was already terminated.
+        """
         if self.is_active:
             self.connection.close()
             self.w_terminator.sendall(NUL)
@@ -118,19 +162,19 @@ class RVar:
         self.target = None
 
     def get(self):
-        """Blocks until the value is :meth:`~RVar.set`` and then returns
+        """Blocks until the value is :meth:`RVar.set`` and then returns
         the value.
 
         .. note:: The returned value is guaranteed never to be ``None``.
         """
         with self.condition:
             while self.target is None:
-                self.condition.wait(timeout=1)
+                _condition_wait(self.condition)
 
         return self.target
 
     def set(self, target):
-        """Sets the value effectively unblocking all :meth:`~RVar.get`
+        """Sets the value, which effectively unblocks all :meth:`RVar.get`
         calls.
         """
         with self.condition:
@@ -253,9 +297,9 @@ class Client(object):
     def read(self, path, default=None):
         """Reads data from a given path.
 
-        :param str path: a path to read from.
-        :param str default: default value, to be used if `path` doesn't
-                            exist.
+        :param bytes path: a path to read from.
+        :param bytes default: default value, to be used if `path` doesn't
+                              exist.
         """
         check_path(path)
         try:
@@ -456,8 +500,10 @@ class Client(object):
     def transaction_end(self, commit=True):
         """End a transaction currently in progress.
 
-        :raises pyxs.exceptions.PyXSError: with ``EAGAIN`` error code if
-                                           there were intervening writes.
+        :raises pyxs.exceptions.PyXSError:
+            with ``EAGAIN`` error code if there were intervening writes.
+            The caller is responsible for repeating all of the operations
+            and re-ending a transaction.
 
         .. versionchanged: 0.4.0
 
@@ -473,7 +519,9 @@ class Client(object):
         """Returns a new :class:`Monitor` instance, which is currently
         *the only way* of doing PUBSUB.
 
-        TODO: note on the router lifetime.
+        The monitor shares the router with its parent client. Thus closing
+        the client invalidates the monitor. Closing the monitor, on the
+        other hand, had no effect on the router state.
         """
         return Monitor(copy.copy(self))
 
@@ -518,6 +566,9 @@ class Monitor(object):
     ...       c.watch("foo/bar")
     ...       print(next(c.wait()))
     Event(...)
+
+    :param Client client: a reference to the parent client.
+    :ivar set watched: a set of paths currently watched by the monitor.
     """
     def __init__(self, client):
         self.client = client
@@ -543,7 +594,7 @@ class Monitor(object):
         :param bytes token: watch token, returned in watch notification.
         """
         check_watch_path(wpath)
-        self.client.router.watch(token, self)
+        self.client.router.subscribe(token, self)
         self.client.ack(Op.WATCH, wpath + NUL, token + NUL)
         self.watched.add(wpath)
 
@@ -555,7 +606,7 @@ class Monitor(object):
         """
         check_watch_path(wpath)
         self.client.ack(Op.UNWATCH, wpath + NUL, token + NUL)
-        self.client.router.unwatch(token, self)
+        self.client.router.unsubscribe(token, self)
         self.watched.discard(wpath)
 
         # TODO: remove from the queue?
