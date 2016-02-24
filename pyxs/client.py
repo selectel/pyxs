@@ -568,12 +568,13 @@ class Monitor(object):
     Event(...)
 
     :param Client client: a reference to the parent client.
-    :ivar set watched: a set of paths currently watched by the monitor.
+    :ivar dict watched: a mapping of path currently watched by the monitor
+                        to the corresponding tokens.
     """
     def __init__(self, client):
         self.client = client
         self.events = queue.Queue()
-        self.watched = set()
+        self.watched = {}
 
     def __enter__(self):
         return self
@@ -587,8 +588,8 @@ class Monitor(object):
 
         Any alteration to the watched path generates an event. This
         includes path creation, removal, contents change or permission
-        change. Changes made in transactions cause an event only if
-        and when committed.
+        change. An event can also be triggered spuriously. Changes made
+        in transactions cause an event only if and when committed.
 
         :param bytes wpath: path to watch.
         :param bytes token: watch token, returned in watch notification.
@@ -615,6 +616,10 @@ class Monitor(object):
         An event is a ``(path, token)`` pair, where the first element
         is event path, i.e. the actual path that was modified, and the
         second -- a token, passed to :meth:`watch`.
+
+        :param bool unwatched: if ``True`` :meth:`wait` might yield
+                               spurious unwatched packets, otherwise
+                               these are dropped. Defaults to ``False``.
         """
         while True:
             with self.events.not_empty:
@@ -627,8 +632,5 @@ class Monitor(object):
             while path and path not in self.watched:
                 path = posixpath.dirname(path)
 
-            if not path:
-                # TODO: drop?
-                raise UnexpectedEvent(event)
-            else:
+            if path or unwatched:
                 yield event

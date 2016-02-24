@@ -75,7 +75,3 @@ class UnexpectedPacket(ConnectionError):
     ``op = Op.READ`` the incoming packet is expected to have
     ``op = Op.READ`` as well.
     """
-
-
-class UnexpectedEvent(ConnectionError):
-    """Exception raised when recieved a packet from a non-watched path."""
