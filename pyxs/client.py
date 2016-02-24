@@ -78,9 +78,13 @@ class Router(object):
                     else:
                         raise UnexpectedPacket(packet)
         finally:
+            self.connection.close()
             self.r_terminator.close()
             self.w_terminator.close()
-            self.connection.disconnect()
+
+    @property
+    def is_active(self):
+        return self.connection.is_active
 
     def watch(self, token, monitor):
         self.monitors[token].append(monitor)
@@ -97,8 +101,9 @@ class Router(object):
             return rvar
 
     def terminate(self):
-        self.w_terminator.sendall(NUL)
-        self.connection.disconnect()
+        if self.is_active:
+            self.connection.close()
+            self.w_terminator.sendall(NUL)
 
 
 class RVar:
@@ -231,6 +236,9 @@ class Client(object):
                   finalized.
         """
         self.router_thread.start()
+
+        while not self.router.is_active:
+            pass
 
     def close(self):
         """Finalizes the client.

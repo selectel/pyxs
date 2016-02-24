@@ -14,6 +14,8 @@ Version 0.3.2
   matches the spec.
 - Removed ``transaction`` argument from ``Client`` constructor. Please
   use the corresponding context manager explicitly.
+- Removed implicit reconnection logic from ``FileDescriptorConnection``.
+  The user is now expected to connect manually.
 
 Version 0.3.1
 -------------

@@ -23,7 +23,7 @@ class xs(Client):
     watches = {}
 
     def close(self):
-        self.connection.disconnect(silent=False)
+        self.connection.close(silent=False)
 
     def execute_command(self, op, *args, **kwargs):
         try:

@@ -44,7 +44,7 @@ class FileDescriptorConnection(object):
     def fileno(self):
         return self.fd
 
-    def disconnect(self, silent=True):
+    def close(self, silent=True):
         """Disconnects from XenStore.
 
         :param bool silent: if ``True`` (default), any errors, raised
@@ -70,8 +70,7 @@ class FileDescriptorConnection(object):
             that point.
         """
         if not self.is_active:
-            self.connect()
-        # TODO: ^^^ remove this auto-connection logic.
+            raise ConnectionError("Not connected")
 
         # Note the ``[:-1]`` slice -- the actual payload is excluded.
         data = packet._struct.pack(*packet[:-1]) + packet.payload
@@ -82,7 +81,7 @@ class FileDescriptorConnection(object):
             if e.args[0] in [errno.ECONNRESET,
                              errno.ECONNABORTED,
                              errno.EPIPE]:
-                self.disconnect()
+                self.close()
 
             raise ConnectionError("Error while writing to {0!r}: {1}"
                                   .format(self.path, e.args))
@@ -90,7 +89,7 @@ class FileDescriptorConnection(object):
     def recv(self):
         """Receives a packet from XenStore."""
         if not self.is_active:
-            self.connect()
+            raise ConnectionError("Not connected")
 
         try:
             header = readall(self.fd, Packet._struct.size)
@@ -98,7 +97,7 @@ class FileDescriptorConnection(object):
             if e.args[0] in [errno.ECONNRESET,
                              errno.ECONNABORTED,
                              errno.EPIPE]:
-                self.disconnect()
+                self.close()
 
             raise ConnectionError("Error while reading from {0!r}: {1}"
                                   .format(self.path, e.args))
