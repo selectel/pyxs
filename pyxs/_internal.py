@@ -11,9 +11,10 @@
 
 from __future__ import unicode_literals
 
-__all__ = ["NUL", "Event", "Op", "Packet"]
+__all__ = ["NUL", "Event", "Op", "Packet", "next_rq_id"]
 
 import struct
+import sys
 from collections import namedtuple
 
 from .exceptions import InvalidOperation, InvalidPayload
@@ -79,6 +80,13 @@ class Packet(namedtuple("_Packet", "op rq_id tx_id size payload")):
         return super(Packet, cls).__new__(cls,
             op, rq_id or 0, tx_id or 0, len(payload), payload)
 
-    @property
-    def token(self):
-        return self.tx_id, self.rq_id
+
+_rq_id = -1
+
+def next_rq_id():
+    """Returns the next available request id."""
+    # XXX we don't need a mutex because of the GIL.
+    global _rq_id
+    _rq_id += 1
+    _rq_id %= sys.maxint
+    return _rq_id

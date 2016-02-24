@@ -32,12 +32,12 @@
     :license: LGPL, see LICENSE for more details.
 """
 
-__all__ = ["Client", "Monitor",
+__all__ = ["Router", "Client", "Monitor",
            "PyXSError", "ConnectionError", "UnexpectedPacket",
            "InvalidOperation", "InvalidPath", "InvalidPayload",
            "xs", "Error"]
 
-from .client import Client, Monitor
+from .client import Router, Client, Monitor
 from .exceptions import PyXSError, ConnectionError, UnexpectedPacket, \
     InvalidOperation, InvalidPath, InvalidPayload
 from ._compat import xs, Error
@@ -46,5 +46,7 @@ from ._compat import xs, Error
 def monitor(*args, **kwargs):
     """A simple shortcut for creating :class:`Monitor` instances.
     All arguments are passed to :class:`Client` constructor.
+
+    TODO: ensure the client is closed.
     """
     return Client(*args, **kwargs).monitor()

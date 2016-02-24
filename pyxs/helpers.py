@@ -29,9 +29,9 @@ _codeerror = dict((message, code)
 
 
 def writeall(fd, data):
-    """Writes a data string to the file descriptor.
+    """Writes data to the file descriptor.
 
-    Calls :func:`os.write` repeatedly, unless all data is written.
+    Calls :func:`os.write` repeatedly unilt all data is written.
     If an error occurs, it's impossible to tell how much data has
     been written.
     """
@@ -41,9 +41,9 @@ def writeall(fd, data):
 
 
 def readall(fd, length):
-    """Reads a data string of a given length from the file descriptor.
+    """Reads data of a given length from the file descriptor.
 
-    Calls :func:`os.read` repeatedly, unless all data is read. If an
+    Calls :func:`os.read` repeatedly until all data is read. If an
     error occurs, it's impossible to tell how much data has been read.
     """
     chunks = []

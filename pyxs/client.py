@@ -38,7 +38,7 @@ if sys.version_info[:2] < (3, 2):
 else:
     _condition_wait = threading.Condition.wait
 
-from ._internal import NUL, Event, Packet, Op
+from ._internal import NUL, Event, Packet, Op, next_rq_id
 from .connection import UnixSocketConnection, XenBusConnection
 from .exceptions import UnexpectedPacket, UnexpectedEvent, PyXSError
 from .helpers import check_path, check_watch_path, check_perms, error
@@ -102,11 +102,12 @@ class Router(object):
                     for monitor in self.monitors[event.token]:
                         monitor.events.put(event)
                 else:
-                    token = packet.token
-                    if token in self.rvars:
-                        self.rvars[token].set(packet)
-                    else:
+                    rvar = self.rvars.pop(packet.rq_id, None)
+                    if rvar is None:
                         raise UnexpectedPacket(packet)
+                    else:
+                        rvar.set(packet)
+
         finally:
             self.connection.close()
             self.r_terminator.close()
@@ -135,7 +136,7 @@ class Router(object):
         with self.send_lock:
             # The order here matters. XenStore might reply to the packet
             # *before* the ``rvar`` is registered.
-            self.rvars[packet.token] = rvar = RVar()
+            self.rvars[packet.rq_id] = rvar = RVar()
             self.connection.send(packet)
             return rvar
 
@@ -160,6 +161,9 @@ class RVar:
     def __init__(self):
         self.condition = threading.Condition()
         self.target = None
+
+    def __repr__(self):
+        return "RVar(target={})".format(None)
 
     def get(self):
         """Blocks until the value is :meth:`RVar.set`` and then returns
@@ -223,7 +227,6 @@ class Client(object):
 
         self.router = router
         self.router_thread = router_thread or threading.Thread(target=router)
-        self.rq_id = 0
         self.tx_id = 0
 
     def __copy__(self):
@@ -248,10 +251,7 @@ class Client(object):
         if not all(map(_re_7bit_ascii.match, args)):
             raise ValueError(args)
 
-        rq_id = self.rq_id
-        self.rq_id += 1
-
-        kwargs.update(tx_id=self.tx_id, rq_id=rq_id)
+        kwargs.update(tx_id=self.tx_id, rq_id=next_rq_id())
         rvar = self.router.send(Packet(op, b"".join(args), **kwargs))
         packet = rvar.get()
         if packet.op is Op.ERROR:
@@ -596,7 +596,7 @@ class Monitor(object):
         check_watch_path(wpath)
         self.client.router.subscribe(token, self)
         self.client.ack(Op.WATCH, wpath + NUL, token + NUL)
-        self.watched.add(wpath)
+        self.watched[wpath] = token
 
     def unwatch(self, wpath, token):
         """Removes a previously added watch.
@@ -607,11 +607,9 @@ class Monitor(object):
         check_watch_path(wpath)
         self.client.ack(Op.UNWATCH, wpath + NUL, token + NUL)
         self.client.router.unsubscribe(token, self)
-        self.watched.discard(wpath)
+        del self.watched[wpath]
 
-        # TODO: remove from the queue?
-
-    def wait(self):
+    def wait(self, unwatched=False):
         """Yields events for all of the watched paths.
 
         An event is a ``(path, token)`` pair, where the first element
