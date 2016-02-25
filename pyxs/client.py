@@ -270,8 +270,9 @@ class Client(object):
         return packet.payload.rstrip(NUL)
 
     def ack(self, *args):
-        if self.execute_command(*args) != b"OK":
-            raise PyXSError("Ooops ...")
+        payload = self.execute_command(*args)
+        if payload != b"OK":
+            raise PyXSError(payload)
 
     # Public API.
     # ...........
