@@ -587,6 +587,10 @@ class Monitor(object):
         return self
 
     def __exit__(self, *exc_info):
+        self.close()
+
+    def close(self):
+        """Finalizes the monitor by unwatching all watched paths."""
         for wpath, token in self.watched.items():
             self.unwatch(wpath, token)
 
