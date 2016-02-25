@@ -261,7 +261,7 @@ class Client(object):
             # Erroneous responses are POSIX error code ending with a
             # ``NUL`` byte.
             raise error(packet.payload[:-1])
-        elif packet.op is not op:
+        elif packet.op is not op or packet.tx_id != self.tx_id:
             raise UnexpectedPacket(packet)
 
         return packet.payload.rstrip(NUL)

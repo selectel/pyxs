@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 
 import errno
+import sys
 from threading import Timer
 
 import pytest
 
 from pyxs.client import Router, Client
 from pyxs.connection import UnixSocketConnection, XenBusConnection
-from pyxs.exceptions import InvalidPayload, InvalidPermission, \
+from pyxs.exceptions import InvalidPath, InvalidPayload, InvalidPermission, \
     UnexpectedPacket, PyXSError
 from pyxs._internal import NUL, Op, Packet
 
@@ -20,7 +21,7 @@ def setup_function(f):
         pass
 
 
-def test_client_init():
+def test_init():
     # a) UnixSocketConnection
     c = Client()
     assert c.tx_id == 0
@@ -32,17 +33,17 @@ def test_client_init():
     assert not c.router_thread.is_alive()
 
     # b) XenBusConnection
-    c = Client(xen_bus_path="/proc/xen/xenbus")
+    c = Client(xen_bus_path="/dev/xen/xenbus")
     assert isinstance(c.router.connection, XenBusConnection)
     assert not c.router_thread.is_alive()
 
 
 virtualized = pytest.mark.skipif(
-    "not os.path.exists('/proc/xen') or not Client.SU")
+    "not os.path.exists('/dev/xen') or not Client.SU")
 
 
 @virtualized
-def test_client_context_manager():
+def test_context_manager():
     # a) no transaction is running
     c = Client()
     assert not c.router_thread.is_alive()
@@ -64,30 +65,17 @@ def test_client_context_manager():
 #     assert c.tx_id == 0
 
 
-# @virtualized
-# def test_execute_command_invalid_characters():
-#     with Client() as c:
-#         c.execute_command(Op.WRITE, b"/foo/bar" + NUL, b"baz")
+@virtualized
+def test_execute_command_invalid_characters():
+    with Client() as c:
+        c.execute_command(Op.WRITE, b"/foo/bar" + NUL, b"baz")
 
-#         with pytest.raises(ValueError):
-#             c.execute_command(Op.DEBUG, b"\x07foo" + NUL)
-
-
-# @virtualized
-# def test_execute_command_validator_fails():
-#     with Client() as c:
-#         COMMAND_VALIDATORS[Op.DEBUG] = lambda *args: False
-#         with pytest.raises(ValueError):
-#             c.execute_command(Op.DEBUG, b"foo" + NUL)
-#         COMMAND_VALIDATORS.pop(Op.DEBUG)
+        with pytest.raises(ValueError):
+            c.execute_command(Op.DEBUG, b"\x07foo" + NUL)
 
 
 # @virtualized
 # def test_execute_command():
-#     # c) ``Packet`` constructor fails.
-#     with pytest.raises(InvalidPayload):
-#         c.execute_command(Op.WRITE, b"/foo/bar" + NUL, b"baz" * 4096)
-
 #     # d) XenStore returned an error code.
 #     with pytest.raises(PyXSError):
 #         c.execute_command(Op.READ, b"/path/to/something" + NUL)
@@ -106,214 +94,195 @@ def test_client_context_manager():
 #         c.execute_command(Op.READ, b"/foo/bar")
 #     c.router.connection.recv = _old_recv
 
-#     # e) ... and a hack for ``XenBusConnection``
-#     c = Client(connection=XenBusConnection())
-#     c.router.connection.recv = lambda *args: Packet(Op.READ, b"boo", tx_id=42)
-#     c.execute_command(Op.READ, b"/foo/bar")
-#     c.router.connection.recv = _old_recv
 
-#     # f) Got a WATCH_EVENT instead of an expected packet type, making
-#     #    sure it's queued properly.
-#     def recv(*args):
-#         if hasattr(recv, "called"):
-#             return Packet(Op.READ, b"boo")
-#         else:
-#             recv.called = True
-#             return Packet(Op.WATCH_EVENT, b"boo")
-#     c.router.connection.recv = recv
-#     c.execute_command(Op.READ, "/foo/bar")
-#     assert len(c.events) == 1
-#     assert c.events[0] == Packet(Op.WATCH_EVENT, b"boo")
-
-#     c.router.connection.recv = _old_recv
-
-#     # Cleaning up.
-#     with Client() as c:
-#         c.execute_command(Op.RM, b"/foo/bar" + NUL)
-
-
-@virtualized
-def test_ack_ok():
-    with Client() as c:
-        c.router.connection.recv = lambda *args: Packet(Op.WRITE, b"OK\x00")
-        c.ack(Op.WRITE, b"/foo", b"bar")
-
-
-@virtualized
-def test_ack_error():
-    with Client() as c:
-        c.router.connection.recv = lambda *args: Packet(Op.WRITE, b"boo")
-        with pytest.raises(PyXSError):
-            c.ack(Op.WRITE, b"/foo", b"bar")
-
-
-with_backend = pytest.mark.parametrize("backend", [
-    UnixSocketConnection, XenBusConnection
+@pytest.mark.parametrize("op", [
+    "read", "mkdir", "rm", "ls", "get_permissions"
 ])
+def test_check_path(op):
+    with pytest.raises(InvalidPath):
+        getattr(Client(), op)(b"INVALID%PATH!")
+
+
+@pytest.yield_fixture(params=[UnixSocketConnection, XenBusConnection])
+def client(request):
+    c = Client(router=Router(request.param()))
+    yield c.__enter__()
+    c.__exit__(sys.exc_info())
 
 
 @virtualized
-@with_backend
-def test_client_read(backend):
-    with Client(router=Router(backend())) as c:
-        # a) non-existant path.
-        try:
-            c.read(b"/foo/bar")
-        except PyXSError as e:
-            assert e.args[0] == errno.ENOENT
+def test_read(client):
+    # a) non-existant path.
+    try:
+        client.read(b"/foo/bar")
+    except PyXSError as e:
+        assert e.args[0] == errno.ENOENT
 
-        # b) OK-case (`/local` is allways in place).
-        assert c.read("/local") == b""
-        assert c["/local"] == b""
+    # b) using a default.
+    client.read(b"/foo/bar", b"baz") == b"baz"
 
-        # c) No read permissions (should be ran in DomU)?
+    # c) OK-case (`/local` is allways in place).
+    assert client.read("/local") == b""
+    assert client["/local"] == b""
 
-
-@virtualized
-@with_backend
-def test_write(backend):
-    with Client(router=Router(backend())) as c:
-        c.write(b"/foo/bar", b"baz")
-        assert c.read(b"/foo/bar") == b"baz"
-
-        c[b"/foo/bar"] = b"boo"
-        assert c[b"/foo/bar"] == b"boo"
-
-        # b) No write permissions (should be ran in DomU)?
+    # d) No read permissions (should be ran in DomU)?
 
 
 @virtualized
-@with_backend
-def test_mkdir(backend):
-    with Client(router=Router(backend())) as c:
-        c.mkdir(b"/foo/bar")
-        assert c.ls(b"/foo") == [b"bar"]
-        assert c.read(b"/foo/bar") == b""
+def test_write(client):
+    client.write(b"/foo/bar", b"baz")
+    assert client.read(b"/foo/bar") == b"baz"
+
+    client[b"/foo/bar"] = b"boo"
+    assert client[b"/foo/bar"] == b"boo"
+
+    # b) No write permissions (should be ran in DomU)?
+
+
+def test_write_invalid():
+    with pytest.raises(InvalidPath):
+        Client().write(b"INVALID%PATH!", b"baz")
 
 
 @virtualized
-@with_backend
-def test_rm(backend):
-    with Client(router=Router(backend())) as c:
-        c.mkdir(b"/foo/bar")
-        c.rm(b"/foo/bar")
-
-        with pytest.raises(PyXSError):
-            c.read(b"/foo/bar")
-
-        c.read(b"/foo/bar", b"baz") == b"baz"  # using a default option.
-
-        assert c.read(b"/foo") == b""
+def test_mkdir(client):
+    client.mkdir(b"/foo/bar")
+    assert client.ls(b"/foo") == [b"bar"]
+    assert client.read(b"/foo/bar") == b""
 
 
 @virtualized
-@with_backend
-def test_ls(backend):
-    with Client(router=Router(backend())) as c:
-        c.mkdir(b"/foo/bar")
+def test_rm(client):
+    client.mkdir(b"/foo/bar")
+    client.rm(b"/foo/bar")
 
-        # a) OK-case.
-        assert c.ls(b"/foo") == [b"bar"]
-        assert c.ls(b"/foo/bar") == []
+    try:
+        client.read(b"/foo/bar")
+    except PyXSError as e:
+        assert e.args[0] == errno.ENOENT
 
-        # b) directory doesn't exist.
-        try:
-            c.ls(b"/path/to/something")
-        except PyXSError as e:
-            assert e.args[0] == errno.ENOENT
-
-        # c) No list permissions (should be ran in DomU)?
+    assert client.read(b"/foo") == b""
 
 
 @virtualized
-@with_backend
-def test_permissions(backend):
-    with Client(router=Router(backend())) as c:
-        c.rm(b"/foo")
-        c.mkdir(b"/foo/bar")
+def test_ls(client):
+    client.mkdir(b"/foo/bar")
 
-        # a) checking default permissions -- full access.
-        assert c.get_permissions(b"/foo/bar") == [b"n0"]
+    # a) OK-case.
+    assert client.ls(b"/foo") == [b"bar"]
+    assert client.ls(b"/foo/bar") == []
 
-        # b) setting new permissions, and making sure it worked.
-        c.set_permissions(b"/foo/bar", [b"b0"])
-        assert c.get_permissions(b"/foo/bar") == [b"b0"]
+    # b) directory doesn't exist.
+    try:
+        client.ls(b"/path/to/something")
+    except PyXSError as e:
+        assert e.args[0] == errno.ENOENT
 
-        # c) conflicting permissions -- XenStore doesn't care.
-        c.set_permissions(b"/foo/bar", [b"b0", b"n0", b"r0"])
-        assert c.get_permissions(b"/foo/bar") == [b"b0", b"n0", b"r0"]
-
-        # d) invalid permission format.
-        with pytest.raises(InvalidPermission):
-            c.set_permissions(b"/foo/bar", [b"x0"])
+    # c) No list permissions (should be ran in DomU)?
 
 
 @virtualized
-@with_backend
-def test_get_domain_path(backend):
-    with Client(router=Router(backend())) as c:
-        # Note, that XenStored doesn't care if a domain exists, but
-        # according to the spec we shouldn't really count on a *valid*
-        # reply in that case.
-        assert c.get_domain_path(0) == b"/local/domain/0"
-        assert c.get_domain_path(999) == b"/local/domain/999"
+def test_permissions(client):
+    client.rm(b"/foo")
+    client.mkdir(b"/foo/bar")
+
+    # a) checking default permissions -- full access.
+    assert client.get_permissions(b"/foo/bar") == [b"n0"]
+
+    # b) setting new permissions, and making sure it worked.
+    client.set_permissions(b"/foo/bar", [b"b0"])
+    assert client.get_permissions(b"/foo/bar") == [b"b0"]
+
+    # c) conflicting permissions -- XenStore doesn't care.
+    client.set_permissions(b"/foo/bar", [b"b0", b"n0", b"r0"])
+    assert client.get_permissions(b"/foo/bar") == [b"b0", b"n0", b"r0"]
+
+    # d) invalid permission format.
+    with pytest.raises(InvalidPermission):
+        client.set_permissions(b"/foo/bar", [b"x0"])
+
+
+def test_set_permissions_invalid():
+    with pytest.raises(InvalidPath):
+        Client().set_permissions(b"INVALID%PATH!", [])
+
+    with pytest.raises(InvalidPermission):
+        Client().set_permissions(b"/foo/bar", ["z"])
 
 
 @virtualized
-@with_backend
-def test_is_domain_introduced(backend):
-    with Client(router=Router(backend())) as c:
-        for domid in map(int, c.ls("/local/domain")):
-            assert c.is_domain_introduced(domid)
-
-        assert not c.is_domain_introduced(999)
+def test_get_domain_path(client):
+    # Note, that XenStore doesn't care if a domain exists, but
+    # according to the spec we shouldn't really count on a *valid*
+    # reply in that case.
+    assert client.get_domain_path(0) == b"/local/domain/0"
+    assert client.get_domain_path(999) == b"/local/domain/999"
 
 
 @virtualized
-@with_backend
-def test_watches(backend):
-    with Client(router=Router(backend())) as c:
-        c.write(b"/foo/bar", b"baz")
-        m = c.monitor()
+def test_is_domain_introduced(client):
+    for domid in map(int, client.ls("/local/domain")):
+        assert client.is_domain_introduced(domid)
+
+    assert not client.is_domain_introduced(999)
+
+
+@virtualized
+def test_monitor(client):
+    if isinstance(client.router.connection, XenBusConnection):
+        # http://lists.xen.org/archives/html/xen-users/2016-02/msg00159.html
+        pytest.xfail("unsupported connection")
+
+    client.write(b"/foo/bar", b"baz")
+    m = client.monitor()
+    m.watch(b"/foo/bar", b"boo")
+
+    waiter = m.wait()
+    # a) we receive the first event immediately, so `next` doesn't
+    #    block.
+    assert next(waiter) == (b"/foo/bar", b"boo")
+
+    # b) before the second call we have to make sure someone
+    #    will change the path being watched.
+    Timer(.1, lambda: client.write(b"/foo/bar", b"baz")).run()
+    assert next(waiter) == (b"/foo/bar", b"boo")
+
+    # c) changing a children of the watched path triggers watch
+    #    event as well.
+    Timer(.1, lambda: client.write(b"/foo/bar/baz", b"???")).run()
+    assert next(waiter) == (b"/foo/bar/baz", b"boo")
+
+
+@pytest.mark.parametrize("op", ["watch", "unwatch"])
+def test_check_watch_path(op):
+    with pytest.raises(InvalidPath):
+        getattr(Client().monitor(), op)(b"INVALID%PATH", b"token")
+
+    with pytest.raises(InvalidPath):
+        getattr(Client().monitor(), op)(b"@arbitraryPath", b"token")
+
+
+@virtualized
+def test_monitor_leftover_events(client):
+    if isinstance(client.router.connection, XenBusConnection):
+        # http://lists.xen.org/archives/html/xen-users/2016-02/msg00159.html
+        pytest.xfail("unsupported connection")
+
+    with client.monitor() as m:
         m.watch(b"/foo/bar", b"boo")
 
-        waiter = m.wait()
-        # a) we receive the first event immediately, so `next` doesn't
-        #    block.
-        assert next(waiter) == (b"/foo/bar", b"boo")
+        def writer():
+            for i in range(128):
+                client[b"/foo/bar"] = str(i).encode()
 
-        # b) before the second call we have to make sure someone
-        #    will change the path being watched.
-        Timer(.1, lambda: c.write(b"/foo/bar", b"baz")).run()
-        assert next(waiter) == (b"/foo/bar", b"boo")
-
-        # c) changing a children of the watched path triggers watch
-        #    event as well.
-        Timer(.1, lambda: c.write(b"/foo/bar/baz", b"???")).run()
-        assert next(waiter) == (b"/foo/bar/baz", b"boo")
+        Timer(.1, writer).run()
+        m.unwatch(b"/foo/bar", b"boo")
+        assert not m.events.empty()
 
 
 @virtualized
-@with_backend
-def test_watch_leftover_events(backend):
-    with Client(router=Router(backend())) as c:
-        with c.monitor() as m:
-            m.watch(b"/foo/bar", b"boo")
-
-            def writer():
-                for i in range(128):
-                    c[b"/foo/bar"] = str(i).encode()
-
-            Timer(.1, writer).run()
-            m.unwatch(b"/foo/bar", b"boo")
-            assert not m.events.empty()
-
-
-@virtualized
-@with_backend
-def test_header_decode_error(backend):
-    with Client(router=Router(backend())) as c:
-        # a) The following packet's header cannot be decoded to UTF-8, but
-        #    we still need to handle it somehow.
-        p = Packet(11, b"/foo", rq_id=0, tx_id=128)
-        c.router.connection.send(p)
+def test_header_decode_error(client):
+    # The following packet's header cannot be decoded to UTF-8, but
+    # we still need to handle it somehow.
+    p = Packet(Op.WRITE, b"/foo", rq_id=0, tx_id=128)
+    client.router.send(p)
