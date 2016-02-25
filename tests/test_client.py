@@ -6,9 +6,9 @@ from threading import Timer
 
 import pytest
 
-from pyxs.client import Router, Client
+from pyxs.client import RVar, Router, Client
 from pyxs.connection import UnixSocketConnection, XenBusConnection
-from pyxs.exceptions import InvalidPath, InvalidPayload, InvalidPermission, \
+from pyxs.exceptions import InvalidPath, InvalidPermission, \
     UnexpectedPacket, PyXSError
 from pyxs._internal import NUL, Op, Packet
 
@@ -74,25 +74,46 @@ def test_execute_command_invalid_characters():
             c.execute_command(Op.DEBUG, b"\x07foo" + NUL)
 
 
-# @virtualized
-# def test_execute_command():
-#     # d) XenStore returned an error code.
-#     with pytest.raises(PyXSError):
-#         c.execute_command(Op.READ, b"/path/to/something" + NUL)
+@virtualized
+def test_execute_command_error():
+    with Client() as c:
+        with pytest.raises(PyXSError):
+            c.execute_command(Op.READ, b"/unexisting/path" + NUL)
 
-#     _old_recv = c.router.connection.recv
-#     # e) XenStore returns a packet with invalid operation in the header.
-#     c.router.connection.recv = lambda *args: Packet(Op.DEBUG, b"boo" + NUL)
-#     with pytest.raises(UnexpectedPacket):
-#         c.execute_command(Op.READ, b"/foo/bar" + NUL)
-#     c.router.connection.recv = _old_recv
+        with pytest.raises(PyXSError):
+            c.execute_command(-42, b"/unexisting/path" + NUL)
 
-#     # d) XenStore returns a packet with invalid transaction id in the
-#     #    header.
-#     c.router.connection.recv = lambda *args: Packet(Op.READ, b"boo", tx_id=42)
-#     with pytest.raises(UnexpectedPacket):
-#         c.execute_command(Op.READ, b"/foo/bar")
-#     c.router.connection.recv = _old_recv
+
+def monkeypatch_router(client, response_packet):
+    class FakeRouter:
+        def send(self, packet):
+            rvar = RVar()
+            rvar.set(response_packet)
+            return rvar
+
+        def terminate(self):
+            pass
+
+    client.close()
+    client.router = FakeRouter()
+
+
+@virtualized
+def test_execute_command_invalid_op():
+    with Client() as c:
+        monkeypatch_router(c, Packet(Op.DEBUG, b"/local" + NUL))
+
+        with pytest.raises(UnexpectedPacket):
+            c.execute_command(Op.READ, b"/local" + NUL)
+
+
+@virtualized
+def test_execute_command_invalid_tx_id():
+    with Client() as c:
+        monkeypatch_router(c, Packet(Op.READ, b"/local" + NUL, tx_id=42))
+
+        with pytest.raises(UnexpectedPacket):
+            c.execute_command(Op.READ, b"/local" + NUL)
 
 
 @pytest.mark.parametrize("op", [
