@@ -241,7 +241,7 @@ def test_set_permissions_invalid():
         Client().set_permissions(b"INVALID%PATH!", [])
 
     with pytest.raises(InvalidPermission):
-        Client().set_permissions(b"/foo/bar", ["z"])
+        Client().set_permissions(b"/foo/bar", [b"z"])
 
 
 @virtualized
