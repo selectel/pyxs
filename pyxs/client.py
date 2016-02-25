@@ -110,7 +110,6 @@ class Router(object):
                         raise UnexpectedPacket(packet)
                     else:
                         rvar.set(packet)
-
         finally:
             self.connection.close()
             self.r_terminator.close()
@@ -118,9 +117,7 @@ class Router(object):
 
     @property
     def is_active(self):
-        """Returns ``True`` if the underlying connection is active and
-        ``False`` otherwise.
-        """
+        """Checks if the underlying connection is active."""
         return self.connection.is_active
 
     def subscribe(self, token, monitor):
@@ -190,7 +187,7 @@ class RVar:
 
 
 class Client(object):
-    """XenStore client -- TODO: <useful comment>.
+    """XenStore client.
 
     :param str xen_bus_path: path to XenBus device, implies that
                              :class:`~pyxs.connection.XenBusConnection`
@@ -210,6 +207,12 @@ class Client(object):
     ...     c.write(b"/foo/bar", b"baz")
     ...     print(c.read(b"/foo/bar"))
     b'baz'
+
+    .. seealso::
+
+       `Xenstore protocol specification \
+       <http://xenbits.xen.org/docs/4.4-testing/misc/xenstore.txt>`_
+       for a description of the protocol, implemented by ``Client``.
     """
     #: A flag, which is ``True`` if we're operating on control domain
     #: and else otherwise.
@@ -278,9 +281,9 @@ class Client(object):
 
         .. versionadded: 0.4.0
 
-        .. note:: This method is unsafe. Please use :class:`Client` as a
-                  context manager to make sure the client is properly
-                  finalized.
+        .. warning:: This method is unsafe. Please use :class:`Client`
+                     as a context manager to make sure the client is
+                     properly finalized.
         """
         self.router_thread.start()
 
@@ -291,9 +294,9 @@ class Client(object):
     def close(self):
         """Finalizes the client.
 
-        .. note:: This method is unsafe. Please use :class:`Client` as a
-                  context manager to make sure the client is properly
-                  finalized.
+        .. warning:: This method is unsafe. Please use :class:`Client`
+                     as a context manager to make sure the client is
+                     properly finalized.
         """
         self.router.terminate()
         self.router_thread.join()
