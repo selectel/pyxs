@@ -358,6 +358,21 @@ class Client(object):
         payload = self.execute_command(Op.DIRECTORY, path + NUL)
         return [] if not payload else payload.split(NUL)
 
+    def exists(self, path):
+        """Checks if a given `path` exists.
+
+        :param bytes path: path to check.
+        """
+        try:
+            self.ls(path)
+        except PyXSError as e:
+            if e.args[0] == errno.ENOENT:
+                return False
+
+            raise
+        else:
+            return True
+
     def get_permissions(self, path):
         """Returns a list of permissions for a given `path`, see
         :exc:`~pyxs.exceptions.InvalidPermission` for details on

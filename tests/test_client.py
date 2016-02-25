@@ -117,7 +117,7 @@ def test_execute_command_invalid_tx_id():
 
 
 @pytest.mark.parametrize("op", [
-    "read", "mkdir", "rm", "ls", "get_permissions"
+    "read", "mkdir", "rm", "ls", "exists", "get_permissions"
 ])
 def test_check_path(op):
     with pytest.raises(InvalidPath):
@@ -198,6 +198,19 @@ def test_ls(client):
         client.ls(b"/path/to/something")
     except PyXSError as e:
         assert e.args[0] == errno.ENOENT
+
+    # c) No list permissions (should be ran in DomU)?
+
+
+@virtualized
+def test_exists(client):
+    # a) Path exists.
+    client.mkdir(b"/foo/bar")
+    assert client.exists(b"/foo/bar")
+
+    # b) Path does not exist.
+    client.rm(b"/foo/bar")
+    assert not client.exists(b"/foo/bar")
 
     # c) No list permissions (should be ran in DomU)?
 

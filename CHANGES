@@ -18,6 +18,8 @@ Version 0.3.2
   The user is now expected to connect manually.
 - Changed ``XenBusConnection`` to prefere ``/dev/xen/xenbus`` on Linux
   due to a possible deadlock in XenBus backend.
+- Added ``Client.exists`` for one-line path existance checks. See PR #6 on
+  GitHub. Thanks to Sandeep Murthy.
 
 Version 0.3.1
 -------------
