@@ -16,6 +16,8 @@ Version 0.3.2
   use the corresponding context manager explicitly.
 - Removed implicit reconnection logic from ``FileDescriptorConnection``.
   The user is now expected to connect manually.
+- Changed ``XenBusConnection`` to prefere ``/dev/xen/xenbus`` on Linux
+  due to a possible deadlock in XenBus backend.
 
 Version 0.3.1
 -------------

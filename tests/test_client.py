@@ -284,13 +284,29 @@ def test_watches(backend):
 
         # b) before the second call we have to make sure someone
         #    will change the path being watched.
-        Timer(.5, lambda: c.write(b"/foo/bar", b"baz")).run()
+        Timer(.1, lambda: c.write(b"/foo/bar", b"baz")).run()
         assert next(waiter) == (b"/foo/bar", b"boo")
 
         # c) changing a children of the watched path triggers watch
         #    event as well.
-        Timer(.5, lambda: c.write(b"/foo/bar/baz", b"???")).run()
+        Timer(.1, lambda: c.write(b"/foo/bar/baz", b"???")).run()
         assert next(waiter) == (b"/foo/bar/baz", b"boo")
+
+
+@virtualized
+@with_backend
+def test_watch_leftover_events(backend):
+    with Client(router=Router(backend())) as c:
+        with c.monitor() as m:
+            m.watch(b"/foo/bar", b"boo")
+
+            def writer():
+                for i in range(128):
+                    c[b"/foo/bar"] = str(i).encode()
+
+            Timer(.1, writer).run()
+            m.unwatch(b"/foo/bar", b"boo")
+            assert not m.events.empty()
 
 
 @virtualized

@@ -171,7 +171,10 @@ class XenBusConnection(FileDescriptorConnection):
             # constants in-place.
             system = platform.system()
 
-            if system == "Linux":
+            if system == "Linux" and not os.access("/dev/xen/xenbus", os.R_OK):
+                # See commit 9c89dc95201ffed5fead17b35754bf9440fdbdc0 in
+                # http://xenbits.xen.org/gitweb/?p=xen.git for details on the
+                # ``os.access`` check.
                 path = "/proc/xen/xenbus"
             elif system == "NetBSD":
                 path = "/kern/xen/xenbus"
