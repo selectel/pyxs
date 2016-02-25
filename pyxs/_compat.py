@@ -64,7 +64,7 @@ class xs(Client):
         try:
             super(xs, self).transaction_end(commit=not abort)
         except Error as e:
-            if len(e.args) is 1:
+            if len(e.args) == 1:  # TODO: Check errno.
                 return False
             raise
         else:

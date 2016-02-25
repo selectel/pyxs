@@ -100,7 +100,7 @@ class Router(object):
                     break
 
                 packet = self.connection.recv()
-                if packet.op is Op.WATCH_EVENT:
+                if packet.op == Op.WATCH_EVENT:
                     event = Event(*packet.payload.split(NUL)[:-1])
                     for monitor in self.monitors[event.token]:
                         monitor.events.put(event)
@@ -257,11 +257,11 @@ class Client(object):
         kwargs.update(tx_id=self.tx_id, rq_id=next_rq_id())
         rvar = self.router.send(Packet(op, b"".join(args), **kwargs))
         packet = rvar.get()
-        if packet.op is Op.ERROR:
+        if packet.op == Op.ERROR:
             # Erroneous responses are POSIX error code ending with a
             # ``NUL`` byte.
             raise error(packet.payload[:-1])
-        elif packet.op is not op or packet.tx_id != self.tx_id:
+        elif packet.op != op or packet.tx_id != self.tx_id:
             raise UnexpectedPacket(packet)
 
         return packet.payload.rstrip(NUL)
