@@ -3,7 +3,7 @@ pyxs Changelog
 
 Here you can see the full list of changes between each pyxs release.
 
-Version 0.3.2
+Version 0.4.0
 -------------
 - Fixed a bug in ``Client.set_permissions`` which coerced permission
   lists (e.g. ``["b0"]``) to repr-strings prior to validation.

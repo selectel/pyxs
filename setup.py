@@ -29,7 +29,7 @@ CLASSIFIERS = (
 )
 
 setup(name="pyxs",
-      version="0.3.2",
+      version="0.4.0",
       packages=["pyxs"],
       setup_requires=["pytest-runner"],
       tests_require=["pytest"],
