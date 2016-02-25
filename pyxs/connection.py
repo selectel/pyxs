@@ -84,7 +84,7 @@ class FileDescriptorConnection(object):
             that point.
         """
         if not self.is_active:
-            raise ConnectionError("Not connected")
+            raise ConnectionError("not connected")
 
         # Note the ``[:-1]`` slice -- the actual payload is excluded.
         data = packet._struct.pack(*packet[:-1]) + packet.payload
@@ -97,13 +97,13 @@ class FileDescriptorConnection(object):
                              errno.EPIPE]:
                 self.close()
 
-            raise ConnectionError("Error while writing to {0!r}: {1}"
+            raise ConnectionError("error while writing to {0!r}: {1}"
                                   .format(self.path, e.args))
 
     def recv(self):
         """Receives a packet from XenStore."""
         if not self.is_active:
-            raise ConnectionError("Not connected")
+            raise ConnectionError("not connected")
 
         try:
             header = readall(self.fd, Packet._struct.size)
@@ -113,7 +113,7 @@ class FileDescriptorConnection(object):
                              errno.EPIPE]:
                 self.close()
 
-            raise ConnectionError("Error while reading from {0!r}: {1}"
+            raise ConnectionError("error while reading from {0!r}: {1}"
                                   .format(self.path, e.args))
         else:
             op, rq_id, tx_id, size = Packet._struct.unpack(header)
@@ -150,7 +150,7 @@ class UnixSocketConnection(FileDescriptorConnection):
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.connect(self.path)
         except socket.error as e:
-            raise ConnectionError("Error connecting to {0!r}: {1}"
+            raise ConnectionError("error connecting to {0!r}: {1}"
                                   .format(self.path, e.args))
         else:
             self.fd = os.dup(sock.fileno())
@@ -190,5 +190,5 @@ class XenBusConnection(FileDescriptorConnection):
         try:
             self.fd = os.open(self.path, os.O_RDWR)
         except OSError as e:
-            raise ConnectionError("Error while opening {0!r}: {1}"
+            raise ConnectionError("error while opening {0!r}: {1}"
                                   .format(self.path, e.args))

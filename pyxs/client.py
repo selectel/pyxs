@@ -40,7 +40,7 @@ else:
 
 from ._internal import NUL, Event, Packet, Op, next_rq_id
 from .connection import UnixSocketConnection, XenBusConnection
-from .exceptions import UnexpectedPacket, PyXSError
+from .exceptions import UnexpectedPacket, ConnectionError, PyXSError
 from .helpers import check_path, check_watch_path, check_perms, error
 
 _re_7bit_ascii = re.compile(b"^[\x00\x20-\x7f]+$")
@@ -285,7 +285,8 @@ class Client(object):
         self.router_thread.start()
 
         while not self.router.is_active:
-            pass
+            if not self.router_thread.is_alive():
+                raise ConnectionError("router died")
 
     def close(self):
         """Finalizes the client.
@@ -453,7 +454,7 @@ class Client(object):
         :param int eventchn: an unbound event chanel in `domid`.
         """
         if not domid:
-            raise ValueError("Dom0 cannot be introduced.")
+            raise ValueError("domain 0 cannot be introduced.")
 
         self.ack(Op.INTRODUCE,
                  str(domid).encode() + NUL,
