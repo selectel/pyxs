@@ -244,11 +244,10 @@ class Client(object):
         return self
 
     def __exit__(self, *exc_info):
-        # TODO: forbid uncommitted transactions.
-        if self.tx_id:
-            self.transaction_end(commit=not any(exc_info))
-
         self.close()
+
+        if self.tx_id and not any(exc_info):
+            raise PyXSError("uncommitted transaction")
 
     # Private API.
     # ............
@@ -341,7 +340,7 @@ class Client(object):
         check_path(path)
         self.ack(Op.MKDIR, path + NUL)
 
-    def rm(self, path):
+    def delete(self, path):
         """Ensures that a given does not exist, by deleting it and all
         of its children. It is not an error if `path` doesn't exist, but
         it **is** an error if `path`'s immediate parent does not exist
@@ -352,9 +351,9 @@ class Client(object):
         check_path(path)
         self.ack(Op.RM, path + NUL)
 
-    __delitem__ = rm
+    __delitem__ = delete
 
-    def ls(self, path):
+    def list(self, path):
         """Returns a list of names of the immediate children of `path`.
 
         :param bytes path: path to list.
@@ -369,7 +368,7 @@ class Client(object):
         :param bytes path: path to check.
         """
         try:
-            self.ls(path)
+            self.list(path)
         except PyXSError as e:
             if e.args[0] == errno.ENOENT:
                 return False
@@ -378,7 +377,7 @@ class Client(object):
         else:
             return True
 
-    def get_permissions(self, path):
+    def get_perms(self, path):
         """Returns a list of permissions for a given `path`, see
         :exc:`~pyxs.exceptions.InvalidPermission` for details on
         permission format.
@@ -389,7 +388,7 @@ class Client(object):
         payload = self.execute_command(Op.GET_PERMS, path + NUL)
         return payload.split(NUL)
 
-    def set_permissions(self, path, perms):
+    def set_perms(self, path, perms):
         """Sets a access permissions for a given `path`, see
         :exc:`~pyxs.exceptions.InvalidPermission` for details on
         permission format.
@@ -409,7 +408,7 @@ class Client(object):
         :param bool topdown: see :func:`os.walk` for details.
         """
         try:
-            children = self.ls(top)
+            children = self.list(top)
         except PyXSError:
             return
 
@@ -507,26 +506,28 @@ class Client(object):
         self.ack(Op.SET_TARGET, str(domid).encode() + NUL,
                  str(target).encode() + NUL)
 
-    def transaction_start(self):
-        """Starts a new transaction and returns transaction handle, which
-        is simply an int.
+    def transaction(self):
+        """Starts a new transaction.
+
+        :returns int: transaction handle.
+        :raises pyxs.exceptions.PyXSError:
+            with :data:`errno.EALREADY` if this client is already in
+            a transaction.
 
         .. warning::
 
            Currently ``xenstored`` has a bug that after 2**32 transactions
            it will allocate id 0 for an actual transaction.
         """
+        if self.tx_id:
+            raise error(errno.EALREADY)
+
         payload = self.execute_command(Op.TRANSACTION_START, NUL)
         self.tx_id = int(payload)
         return self.tx_id
 
-    def transaction_end(self, commit=True):
-        """End a transaction currently in progress.
-
-        :raises pyxs.exceptions.PyXSError:
-            with ``EAGAIN`` error code if there were intervening writes.
-            The caller is responsible for repeating all of the operations
-            and re-ending a transaction.
+    def rollback(self):
+        """Rolls back a transaction currently in progress.
 
         .. versionchanged: 0.4.0
 
@@ -535,8 +536,34 @@ class Client(object):
            longer the case. The method will send the corresponding command
            to XenStore.
         """
-        self.ack(Op.TRANSACTION_END, b"FT"[commit] + NUL)
+        self.ack(Op.TRANSACTION_END, b"F" + NUL)
         self.tx_id = 0
+
+    def commit(self, commit=True):
+        """Commits a transaction currently in progress.
+
+        :returns bool: ``False`` if there were intervening writes and
+                       ``True`` otherwise. The caller is responsible
+                       for repeating all operations and re-committing
+                       the transaction.
+
+        .. versionchanged: 0.4.0
+
+           In previous versions the method gracefully handled attempts to
+           end a transaction when no transaction was running. This is no
+           longer the case. The method will send the corresponding command
+           to XenStore.
+        """
+        try:
+            self.ack(Op.TRANSACTION_END, b"T" + NUL)
+        except PyXSError as e:
+            if e.args[0] == errno.EAGAIN:
+                return False
+
+            raise
+        else:
+            self.tx_id = 0
+            return True
 
     def monitor(self):
         """Returns a new :class:`Monitor` instance, which is currently
@@ -547,37 +574,6 @@ class Client(object):
         other hand, had no effect on the router state.
         """
         return Monitor(copy.copy(self))
-
-    @contextmanager
-    def transaction(self):
-        """Returns a new :class:`Client` instance, operating within a
-        new transaction; can only be used only when no transaction is
-        running. Here's an example:
-
-        >>> with Client() as c:
-        ...     with c.transaction():
-        ...         c.do_something()
-        ...         c.transaction_end(commit=True)
-
-        The last line is completely optional, since the default behaviour
-        is to end the transaction on context manager exit.
-
-        :raises pyxs.exceptions.PyXSError: if this client is already
-                                           operating within a transaction.
-
-        .. note::
-
-           The transaction is committed only if there was no exception
-           in the ``with`` block.
-
-        TODO: make a decorator.
-        """
-        if self.tx_id:
-            raise error(errno.EALREADY)
-
-        self.transaction_start()
-        yield
-        self.transaction_end(commit=not any(sys.exc_info()))
 
 
 class Monitor(object):

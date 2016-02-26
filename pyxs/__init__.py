@@ -37,16 +37,19 @@ __all__ = ["Router", "Client", "Monitor",
            "InvalidOperation", "InvalidPath", "InvalidPayload",
            "xs", "Error"]
 
+from contextlib import contextmanager
+
 from .client import Router, Client, Monitor
 from .exceptions import PyXSError, ConnectionError, UnexpectedPacket, \
     InvalidOperation, InvalidPath, InvalidPayload
 from ._compat import xs, Error
 
 
+@contextmanager
 def monitor(*args, **kwargs):
     """A simple shortcut for creating :class:`Monitor` instances.
-    All arguments are passed to :class:`Client` constructor.
-
-    TODO: ensure the client is closed.
+    All arguments are forwared to :class:`Client` constructor.
     """
-    return Client(*args, **kwargs).monitor()
+    with Client(*args, **kwargs) as c:
+        with c.monitor() as m:
+            yield m

@@ -16,7 +16,7 @@ from pyxs._internal import NUL, Op, Packet
 def setup_function(f):
     try:
         with Client() as c:
-            c.rm(b"/foo")
+            c.delete(b"/foo")
     except PyXSError:
         pass
 
@@ -52,17 +52,6 @@ def test_context_manager():
         assert c.router_thread.is_alive()
 
     assert not c.router_thread.is_alive()
-
-
-# @virtualized
-# def test_transaction_context_manager():
-#     # b) transaction in progress -- expecting it to be commited on
-#     #    context manager exit.
-#     c = Client()
-#     with c.transaction():
-#         assert c.tx_id != 0
-
-#     assert c.tx_id == 0
 
 
 @virtualized
@@ -117,7 +106,7 @@ def test_execute_command_invalid_tx_id():
 
 
 @pytest.mark.parametrize("op", [
-    "read", "mkdir", "rm", "ls", "exists", "get_permissions"
+    "read", "mkdir", "delete", "list", "exists", "get_perms"
 ])
 def test_check_path(op):
     with pytest.raises(InvalidPath):
@@ -127,8 +116,10 @@ def test_check_path(op):
 @pytest.yield_fixture(params=[UnixSocketConnection, XenBusConnection])
 def client(request):
     c = Client(router=Router(request.param()))
-    yield c.__enter__()
-    c.__exit__(sys.exc_info())
+    try:
+        yield c.__enter__()
+    finally:
+        c.__exit__(sys.exc_info())
 
 
 @virtualized
@@ -146,7 +137,7 @@ def test_read(client):
     assert client.read("/local") == b""
     assert client["/local"] == b""
 
-    # d) No read permissions (should be ran in DomU)?
+    # d) No read perms (should be ran in DomU)?
 
 
 @virtualized
@@ -157,7 +148,7 @@ def test_write(client):
     client[b"/foo/bar"] = b"boo"
     assert client[b"/foo/bar"] == b"boo"
 
-    # b) No write permissions (should be ran in DomU)?
+    # b) No write perms (should be ran in DomU)?
 
 
 def test_write_invalid():
@@ -168,14 +159,14 @@ def test_write_invalid():
 @virtualized
 def test_mkdir(client):
     client.mkdir(b"/foo/bar")
-    assert client.ls(b"/foo") == [b"bar"]
+    assert client.list(b"/foo") == [b"bar"]
     assert client.read(b"/foo/bar") == b""
 
 
 @virtualized
-def test_rm(client):
+def test_delete(client):
     client.mkdir(b"/foo/bar")
-    client.rm(b"/foo/bar")
+    client.delete(b"/foo/bar")
 
     try:
         client.read(b"/foo/bar")
@@ -186,20 +177,20 @@ def test_rm(client):
 
 
 @virtualized
-def test_ls(client):
+def test_list(client):
     client.mkdir(b"/foo/bar")
 
     # a) OK-case.
-    assert client.ls(b"/foo") == [b"bar"]
-    assert client.ls(b"/foo/bar") == []
+    assert client.list(b"/foo") == [b"bar"]
+    assert client.list(b"/foo/bar") == []
 
     # b) directory doesn't exist.
     try:
-        client.ls(b"/path/to/something")
+        client.list(b"/path/to/something")
     except PyXSError as e:
         assert e.args[0] == errno.ENOENT
 
-    # c) No list permissions (should be ran in DomU)?
+    # c) No list perms (should be ran in DomU)?
 
 
 @virtualized
@@ -209,39 +200,39 @@ def test_exists(client):
     assert client.exists(b"/foo/bar")
 
     # b) Path does not exist.
-    client.rm(b"/foo/bar")
+    client.delete(b"/foo/bar")
     assert not client.exists(b"/foo/bar")
 
-    # c) No list permissions (should be ran in DomU)?
+    # c) No list perms (should be ran in DomU)?
 
 
 @virtualized
-def test_permissions(client):
-    client.rm(b"/foo")
+def test_perms(client):
+    client.delete(b"/foo")
     client.mkdir(b"/foo/bar")
 
-    # a) checking default permissions -- full access.
-    assert client.get_permissions(b"/foo/bar") == [b"n0"]
+    # a) checking default perms -- full access.
+    assert client.get_perms(b"/foo/bar") == [b"n0"]
 
-    # b) setting new permissions, and making sure it worked.
-    client.set_permissions(b"/foo/bar", [b"b0"])
-    assert client.get_permissions(b"/foo/bar") == [b"b0"]
+    # b) setting new perms, and making sure it worked.
+    client.set_perms(b"/foo/bar", [b"b0"])
+    assert client.get_perms(b"/foo/bar") == [b"b0"]
 
-    # c) conflicting permissions -- XenStore doesn't care.
-    client.set_permissions(b"/foo/bar", [b"b0", b"n0", b"r0"])
-    assert client.get_permissions(b"/foo/bar") == [b"b0", b"n0", b"r0"]
+    # c) conflicting perms -- XenStore doesn't care.
+    client.set_perms(b"/foo/bar", [b"b0", b"n0", b"r0"])
+    assert client.get_perms(b"/foo/bar") == [b"b0", b"n0", b"r0"]
 
     # d) invalid permission format.
     with pytest.raises(InvalidPermission):
-        client.set_permissions(b"/foo/bar", [b"x0"])
+        client.set_perms(b"/foo/bar", [b"x0"])
 
 
-def test_set_permissions_invalid():
+def test_set_perms_invalid():
     with pytest.raises(InvalidPath):
-        Client().set_permissions(b"INVALID%PATH!", [])
+        Client().set_perms(b"INVALID%PATH!", [])
 
     with pytest.raises(InvalidPermission):
-        Client().set_permissions(b"/foo/bar", [b"z"])
+        Client().set_perms(b"/foo/bar", [b"z"])
 
 
 @virtualized
@@ -255,7 +246,7 @@ def test_get_domain_path(client):
 
 @virtualized
 def test_is_domain_introduced(client):
-    for domid in map(int, client.ls("/local/domain")):
+    for domid in map(int, client.list("/local/domain")):
         assert client.is_domain_introduced(domid)
 
     assert not client.is_domain_introduced(999)
@@ -297,9 +288,79 @@ def test_check_watch_path(op):
 
 
 @virtualized
+def test_transaction(client):
+    assert client.tx_id == 0
+    client.transaction()
+    assert client.tx_id != 0
+
+
+@virtualized
+def test_nested_transaction(client):
+    client.transaction()
+
+    with pytest.raises(PyXSError):
+        client.transaction()
+
+
+@virtualized
+def test_transaction_rollback(client):
+    assert not client.exists(b"/foo/bar")
+    client.transaction()
+    client[b"/foo/bar"] = b"boo"
+    client.rollback()
+    assert client.tx_id == 0
+    assert not client.exists(b"/foo/bar")
+
+
+@virtualized
+def test_transaction_commit_ok(client):
+    assert not client.exists(b"/foo/bar")
+    client.transaction()
+    client[b"/foo/bar"] = b"boo"
+    assert client.commit()
+    assert client.tx_id == 0
+    assert client[b"/foo/bar"] == b"boo"
+
+
+@virtualized
+def test_transaction_commit_retry(client):
+    def writer():
+        with Client() as other:
+            other[b"/foo/bar"] = b"unexpected write"
+
+    assert not client.exists(b"/foo/bar")
+    client.transaction()
+    writer()
+    client[b"/foo/bar"] = b"boo"
+    assert not client.commit()
+
+
+@virtualized
+def test_transaction_exception():
+    try:
+        with Client() as c:
+            assert not c.exists(b"/foo/bar")
+            c.transaction()
+            c[b"/foo/bar"] = b"boo"
+            raise ValueError
+    except ValueError:
+        pass
+
+    with Client() as c:
+        assert not c.exists(b"/foo/bar")
+
+
+@virtualized
+def test_uncommitted_transaction():
+    with pytest.raises(PyXSError):
+        with Client() as c:
+            c.transaction()
+
+
+@virtualized
 def test_monitor_leftover_events(client):
     if isinstance(client.router.connection, XenBusConnection):
-        # http://lists.xen.org/archives/html/xen-users/2016-02/msg00159.html
+        # http://lists.xen.org/archives/html/xen-devel/2016-02/msg03816.html
         pytest.xfail("unsupported connection")
 
     with client.monitor() as m:

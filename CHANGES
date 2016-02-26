@@ -13,13 +13,27 @@ Version 0.4.0
   sense to allow any Unicode string as input and then validate if it
   matches the spec.
 - Removed ``transaction`` argument from ``Client`` constructor. Please
-  use the corresponding context manager explicitly.
+  use the corresponding methods explicitly.
+- Renamed some of the ``Client`` methods to more human-readable names:
+
+  =================  ===================
+  Old name           New name
+  =================  ===================
+  ls                 list
+  rm                 delete
+  get_permissions    get_perms
+  set_permissions    set_perms
+  transaction_start  transaction
+  transaction_end    commit and rollback
+  =================  ===================
+- Removed ``Client.transaction`` context manager, because it didn't provide
+  a way to handle possible commit failure.
+- Added ``Client.exists`` for one-line path existance checks. See PR #6 on
+  GitHub. Thanks to Sandeep Murthy.
 - Removed implicit reconnection logic from ``FileDescriptorConnection``.
   The user is now expected to connect manually.
 - Changed ``XenBusConnection`` to prefere ``/dev/xen/xenbus`` on Linux
   due to a possible deadlock in XenBus backend.
-- Added ``Client.exists`` for one-line path existance checks. See PR #6 on
-  GitHub. Thanks to Sandeep Murthy.
 
 Version 0.3.1
 -------------
