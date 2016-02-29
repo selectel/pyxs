@@ -2,11 +2,12 @@ import pytest
 
 from pyxs._compat import xs, Error
 
+
 def setup_function(f):
     handle = xs()
     try:
         handle.rm(0, b"/foo")
-    except PyXSError:
+    except Error:
         pass
     finally:
         handle.close()
@@ -19,6 +20,19 @@ def handle():
         yield handle
     finally:
         handle.close()
+
+
+def test_api_completeness():
+    try:
+        from xen.lowlevel.xs import xs as cxs
+    except ImportError:
+        pytest.skip("xen.lowlevel.xs not available")
+
+    def public_methods(target):
+        return set(attr for attr in dir(target)
+                   if not attr.startswith("_"))
+
+    assert public_methods(cxs).issubset(public_methods(xs))
 
 
 def test_ls(handle):

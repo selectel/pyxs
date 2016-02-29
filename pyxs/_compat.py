@@ -49,6 +49,10 @@ class xs:
 
             raise
 
+    def mkdir(self, tx_id, path):
+        self.client.tx_id = int(tx_id or 0)
+        self.client.mkdir(path)
+
     def rm(self, tx_id, path):
         self.client.tx_id = int(tx_id or 0)
         self.client.delete(path)
@@ -61,8 +65,20 @@ class xs:
         self.client.tx_id = int(tx_id or 0)
         return self.client.write(path, value)
 
+    def get_domain_path(self, domid):
+        return self.client.get_domain_path(domid)
+
     def introduce_domain(self, domid, mfn, eventchn):
         self.client.introduce_domain(domid, mfn, eventchn)
+
+    def release_domain(self, domid):
+        self.client.release_domain(domid)
+
+    def resume_domain(self, domid):
+        self.client.resume_domain(domid)
+
+    def set_target(self, domid, target):
+        self.client.set_target(domid, target)
 
     def transaction_start(self):
         return str(self.client.transaction())
