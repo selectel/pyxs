@@ -9,8 +9,6 @@
     :license: LGPL, see LICENSE for more details.
 """
 
-from __future__ import unicode_literals
-
 __all__ = ["NUL", "Event", "Op", "Packet", "next_rq_id"]
 
 import struct
@@ -24,27 +22,27 @@ NUL = b"\x00"
 
 #: Operations supported by XenStore.
 Operations = Op = namedtuple("Operations", [
-    "DEBUG",                  # 0
-    "DIRECTORY",              # 1
-    "READ",                   # 2
-    "GET_PERMS",              # 3
-    "WATCH",                  # 4
-    "UNWATCH",                # 5
-    "TRANSACTION_START",      # 6
-    "TRANSACTION_END",        # 7
-    "INTRODUCE",              # 8
-    "RELEASE",                # 9
-    "GET_DOMAIN_PATH",        # 10
-    "WRITE",                  # 11
-    "MKDIR",                  # 12
-    "RM",                     # 13
-    "SET_PERMS",              # 14
-    "WATCH_EVENT",            # 15
-    "ERROR",                  # 16
-    "IS_DOMAIN_INTRODUCED",   # 17
-    "RESUME",                 # 18
-    "SET_TARGET",             # 19
-    "RESTRICT"                # 128
+    "DEBUG",                 # 0
+    "DIRECTORY",             # 1
+    "READ",                  # 2
+    "GET_PERMS",             # 3
+    "WATCH",                 # 4
+    "UNWATCH",               # 5
+    "TRANSACTION_START",     # 6
+    "TRANSACTION_END",       # 7
+    "INTRODUCE",             # 8
+    "RELEASE",               # 9
+    "GET_DOMAIN_PATH",       # 10
+    "WRITE",                 # 11
+    "MKDIR",                 # 12
+    "RM",                    # 13
+    "SET_PERMS",             # 14
+    "WATCH_EVENT",           # 15
+    "ERROR",                 # 16
+    "IS_DOMAIN_INTRODUCED",  # 17
+    "RESUME",                # 18
+    "SET_TARGET",            # 19
+    "RESTRICT"               # 128
 ])(*(list(range(20)) + [128]))
 
 

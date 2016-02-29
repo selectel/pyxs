@@ -15,10 +15,6 @@ import errno
 import re
 import os
 import posixpath
-import sys
-
-if sys.version_info[0] < 3:
-    bytes, str = str, unicode
 
 from .exceptions import InvalidPath, InvalidPermission, PyXSError
 
