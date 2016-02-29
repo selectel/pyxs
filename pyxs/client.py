@@ -24,7 +24,6 @@ import select
 import sys
 import threading
 from collections import defaultdict
-from contextlib import contextmanager
 from functools import partial
 
 try:
@@ -61,8 +60,8 @@ class Router(object):
     .. note::
 
        Python lacks API for interrupting a thread from another thread.
-       This means that when a router is in the :func:`select.select` or
-       :meth:`~threading.Condition.wait` call in cannot be stopped.
+       This means that when a router cannot be stopped when it is blocked
+       in :func:`select.select` or :meth:`~threading.Condition.wait`.
 
        The following two "hacks" are used to ensure prompt termination.
 
@@ -208,6 +207,13 @@ class Client(object):
     ...     print(c.read(b"/foo/bar"))
     b'baz'
 
+    .. note::
+
+       Each client has a :class:`Router` thread running in the
+       background. Always finalize the client either explicitly by calling
+       :meth:`Client.close` or implicitly via a context manager
+       to prevent data loss.
+
     .. seealso::
 
        `Xenstore protocol specification \
@@ -230,9 +236,17 @@ class Client(object):
                 connection = XenBusConnection(xen_bus_path)
 
             router = Router(connection)
+        if router_thread is None:
+            # Router thread is daemonic to prevent blocking in case
+            # the client wasn't finilzed properly, e.g. unhandled
+            # exception outside of ``with``. As a result, we cannot
+            # guarantee data integrity unless either ``close`` or
+            # ``__exit__`` was closed.
+            router_thread = threading.Thread(target=router)
+            router_thread.daemon = True
 
         self.router = router
-        self.router_thread = router_thread or threading.Thread(target=router)
+        self.router_thread = router_thread
         self.tx_id = 0
 
     def __copy__(self):

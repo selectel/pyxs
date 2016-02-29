@@ -105,6 +105,14 @@ def test_execute_command_invalid_tx_id():
             c.execute_command(Op.READ, b"/local" + NUL)
 
 
+@virtualized
+def test_close_idempotent():
+    c = Client()
+    c.connect()
+    c.close()
+    c.close()
+
+
 @pytest.mark.parametrize("op", [
     "read", "mkdir", "delete", "list", "exists", "get_perms"
 ])
