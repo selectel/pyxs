@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import absolute_import
+
 import errno
 import sys
 from threading import Timer
@@ -11,6 +13,8 @@ from pyxs.connection import UnixSocketConnection, XenBusConnection
 from pyxs.exceptions import InvalidPath, InvalidPermission, \
     UnexpectedPacket, PyXSError
 from pyxs._internal import NUL, Op, Packet
+
+from . import virtualized
 
 
 def setup_function(f):
@@ -36,10 +40,6 @@ def test_init():
     c = Client(xen_bus_path="/dev/xen/xenbus")
     assert isinstance(c.router.connection, XenBusConnection)
     assert not c.router_thread.is_alive()
-
-
-virtualized = pytest.mark.skipif(
-    "not os.path.exists('/dev/xen') or not Client.SU")
 
 
 @virtualized

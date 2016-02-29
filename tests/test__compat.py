@@ -1,10 +1,21 @@
+# -*- coding: utf-8 -*-
+
+from __future__ import absolute_import
+
 import pytest
 
 from pyxs._compat import xs, Error
 
+from . import virtualized
 
+
+@virtualized
 def setup_function(f):
-    handle = xs()
+    try:
+        handle = xs()
+    except Error:
+        return  # Failed to connect.
+
     try:
         handle.rm(0, b"/foo")
     except Error:
@@ -35,14 +46,17 @@ def test_api_completeness():
     assert public_methods(cxs).issubset(public_methods(xs))
 
 
+@virtualized
 def test_ls(handle):
     assert handle.ls(0, b"/missing/path") is None
 
 
+@virtualized
 def test_transaction_start(handle):
     assert isinstance(handle.transaction_start(), bytes)
 
 
+@virtualized
 def test_transaction_end_rollback(handle):
     assert handle.ls(0, b"/foo") is None
     tx_id = handle.transaction_start()
@@ -51,6 +65,7 @@ def test_transaction_end_rollback(handle):
     assert handle.ls(0, b"/foo") is None
 
 
+@virtualized
 def test_transaction_end_commit(handle):
     assert handle.ls(0, b"/foo") is None
     tx_id = handle.transaction_start()
@@ -59,6 +74,7 @@ def test_transaction_end_commit(handle):
     assert handle.ls(0, b"/foo") == [b"bar"]
 
 
+@virtualized
 def test_watch_unwatch(handle):
     token = object()
     handle.watch(b"/foo/bar", token)
