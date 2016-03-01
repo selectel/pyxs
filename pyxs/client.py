@@ -68,7 +68,7 @@ class Router(object):
        1. A router is equipped with a :func:`socket.socketpair`. The
           reader-end of the pair is selected in the mainloop alongside
           the XenStore connection, while the writer-end is used in
-          :meth:`Router.terminate` to force-stop the mainloop.
+          :meth:`terminate` to force-stop the mainloop.
        2. All operations with :class:`threading.Condition` variables user
           a 1 second timeout. This "hack" is only relevant for Python
           prior to 3.2 which didn't allow to interrupt lock acquisitions.
@@ -165,8 +165,7 @@ class RVar:
         return "RVar({0})".format(self.target)
 
     def get(self):
-        """Blocks until the value is :meth:`RVar.set`` and then returns
-        the value.
+        """Blocks until the value is :meth:`set`` and then returns the value.
 
         .. note:: The returned value is guaranteed never to be ``None``.
         """
@@ -177,9 +176,7 @@ class RVar:
         return self.target
 
     def set(self, target):
-        """Sets the value, which effectively unblocks all :meth:`RVar.get`
-        calls.
-        """
+        """Sets the value, which effectively unblocks all :meth:`get` calls."""
         with self.condition:
             self.target = target
             self.condition.notify_all()
