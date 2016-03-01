@@ -674,7 +674,8 @@ class Monitor(object):
         """
         while True:
             with self.events.not_empty:
-                _condition_wait(self.events.not_empty)
+                while not self.events._qsize():
+                    _condition_wait(self.events.not_empty)
 
             event = self.events.get_nowait()
 
