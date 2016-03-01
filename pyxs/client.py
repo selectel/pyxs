@@ -631,7 +631,7 @@ class Monitor(object):
 
     def close(self):
         """Finalizes the monitor by unwatching all watched paths."""
-        for wpath, token in self.watched.items():
+        for wpath, token in list(self.watched.items()):
             self.unwatch(wpath, token)
 
     def watch(self, wpath, token):

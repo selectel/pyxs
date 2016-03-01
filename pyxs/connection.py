@@ -25,7 +25,7 @@ from ._internal import Packet
 
 
 class FileDescriptorConnection(object):
-    """Abstract XenStore connection, using an fd for I/O operations.
+    """Abstract XenStore connection which uses an fd for I/O operations.
 
     Subclasses are expected to define :meth:`connect()` and set
     :attr:`fd` and :attr:`path` attributes, where `path` is a human

@@ -81,7 +81,7 @@ class xs:
         self.client.set_target(domid, target)
 
     def transaction_start(self):
-        return str(self.client.transaction())
+        return str(self.client.transaction()).encode()
 
     def transaction_end(self, tx_id, abort=0):
         self.client.tx_id = int(tx_id or 0)

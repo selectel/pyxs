@@ -142,8 +142,8 @@ def test_read(client):
     client.read(b"/foo/bar", b"baz") == b"baz"
 
     # c) OK-case (`/local` is allways in place).
-    assert client.read("/local") == b""
-    assert client["/local"] == b""
+    assert client.read(b"/local") == b""
+    assert client[b"/local"] == b""
 
     # d) No read perms (should be ran in DomU)?
 
@@ -254,7 +254,7 @@ def test_get_domain_path(client):
 
 @virtualized
 def test_is_domain_introduced(client):
-    for domid in map(int, client.list("/local/domain")):
+    for domid in map(int, client.list(b"/local/domain")):
         assert client.is_domain_introduced(domid)
 
     assert not client.is_domain_introduced(999)

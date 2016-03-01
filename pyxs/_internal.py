@@ -86,5 +86,5 @@ def next_rq_id():
     # XXX we don't need a mutex because of the GIL.
     global _rq_id
     _rq_id += 1
-    _rq_id %= sys.maxint
+    _rq_id %= sys.maxsize
     return _rq_id
