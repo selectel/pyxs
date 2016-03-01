@@ -100,15 +100,16 @@ class xs:
 
     def watch(self, path, token):
         # Even though ``xs.watch`` docstring states that token should be
-        # a string, it in fact can be any Python object; and unfortunately
-        # some scripts rely on that behaviour.
-        stub = bytes(id(token))
+        # a string, it in fact can be any Python object. We mimic this
+        # behaviour here, but it can be a source of hard to find bugs.
+        stub = str(id(token)).encode()
         self.token_aliases[stub] = token
         return self.monitor.watch(path, stub)
 
     def unwatch(self, path, token):
-        stub = bytes(id(token))
-        return self.monitor.unwatch(path, stub)
+        stub = str(id(token)).encode()
+        self.monitor.unwatch(path, stub)
+        del self.token_aliases[stub]
 
     def read_watch(self):
         event = next(self.monitor.wait())
