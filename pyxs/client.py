@@ -586,7 +586,20 @@ class Client(object):
         The monitor shares the router with its parent client. Thus closing
         the client invalidates the monitor. Closing the monitor, on the
         other hand, had no effect on the router state.
+
+        .. note::
+
+           Using :meth:`monitor` over :class`XenBusConnection` is currently
+           unsupported, because XenBus does not obey XenStore protocol
+           specification. See `xen-devel`_ discussion for details.
+
+            .. _xen-devel: \
+               http://lists.xen.org/archives/html/xen-devel/2016-02/msg03737
         """
+        if isinstance(self.router.connection, XenBusConnection):
+            raise PyXSError("using ``Monitor`` over XenBus is not supported",
+                            UserWarning)
+
         return Monitor(copy.copy(self))
 
 

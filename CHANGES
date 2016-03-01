@@ -34,6 +34,9 @@ Version 0.4.0
   The user is now expected to connect manually.
 - Changed ``XenBusConnection`` to prefere ``/dev/xen/xenbus`` on Linux
   due to a possible deadlock in XenBus backend.
+- Disallowed calling ``Client.monitor`` over ``XenBusConnection``. See
+  http://lists.xen.org/archives/html/xen-devel/2016-02/msg03816 for
+  details.
 
 Version 0.3.1
 -------------
