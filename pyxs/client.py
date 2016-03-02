@@ -236,6 +236,9 @@ class Client(object):
         self.router_thread = router_thread
         self.tx_id = 0
 
+    def __repr__(self):
+        return "Client({0})".format(self.router.connection)
+
     def __copy__(self):
         return self.__class__(router=self.router,
                               router_thread=self.router_thread)

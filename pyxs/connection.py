@@ -45,7 +45,7 @@ class FileDescriptorConnection(object):
         else:
             status = "initial"
 
-        return "{0}({1})".format(self.__class__.__name__, self.path, status)
+        return "{0}({1!r})".format(self.__class__.__name__, self.path, status)
 
     @property
     def is_active(self):

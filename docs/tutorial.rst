@@ -34,6 +34,32 @@ to DIY. The context manager will make sure that a started transaction
 was either rolled back or committed and close the underlying XenStore
 connection afterwards.
 
+Connections
+-----------
+
+:mod:`pyxs` supports two ways of communicating with XenStore:
+
+* over a Unix socket with :class:`~pyxs.connection.UnixSocketConnection`;
+* over XenBus_ with :class:`~pyxs.connection.XenBusConnection`.
+
+Connection type is determined from the arguments passed to
+:class:`~pyxs.client.Client` constructor. For example, the
+following code creates a :class:`~pyxs.client.Client` instance,
+operating over a Unix socket::
+
+    >>> Client(unix_socket_path="/var/run/xenstored/socket_ro")
+    Client(UnixSocketConnection('/var/run/xenstored/socket_ro'))
+    >>> Client()
+    Client(UnixSocketConnection('/var/run/xenstored/socket'))
+
+Use ``xen_bus_path`` argument to initialize a :class:`~pyxs.client.Client` with
+:class:`~pyxs.connection.XenBusConnection`::
+
+    >>> Client(xen_bus_path="/dev/xen/xenbus")
+    Client(XenBusConnection('/dev/xen/xenbus'))
+
+.. _XenBus: http://wiki.xensource.com/xenwiki/XenBus
+
 Transactions
 ------------
 
