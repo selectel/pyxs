@@ -13,4 +13,5 @@ into the :ref:`api`; ``pyxs`` also has a couple of examples in the
 
    tutorial
    api
+   contributing
    changelog
