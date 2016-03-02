@@ -115,9 +115,9 @@ class Router(object):
             self.w_terminator.close()
 
     @property
-    def is_active(self):
+    def is_connected(self):
         """Checks if the underlying connection is active."""
-        return self.connection.is_active
+        return self.connection.is_connected
 
     def subscribe(self, token, monitor):
         """Subscribes a ``monitor`` to events with a given ``token``."""
@@ -145,7 +145,7 @@ class Router(object):
         After termination the router can no longer send or receive packets.
         Does nothing if the router was already terminated.
         """
-        if self.is_active:
+        if self.is_connected:
             self.connection.close()
             self.w_terminator.sendall(NUL)
 
@@ -291,7 +291,7 @@ class Client(object):
         """
         self.router_thread.start()
 
-        while not self.router.is_active:
+        while not self.router.is_connected:
             if not self.router_thread.is_alive():
                 raise ConnectionError("router died")
 

@@ -38,22 +38,11 @@ class FileDescriptorConnection(object):
             "__init__() should be overridden by subclasses.")
 
     def __repr__(self):
-        if self.is_closed:
-            status = "closed"
-        elif self.is_active:
-            status = "connected"
-        else:
-            status = "initial"
-
-        return "{0}({1!r})".format(self.__class__.__name__, self.path, status)
+        return "{0}({1!r})".format(self.__class__.__name__, self.path)
 
     @property
-    def is_active(self):
+    def is_connected(self):
         return self.fd is not None
-
-    @property
-    def is_closed(self):
-        return self.path is None
 
     def fileno(self):
         return self.fd
@@ -65,7 +54,7 @@ class FileDescriptorConnection(object):
                             while closing the file descriptor are
                             suppressed.
         """
-        if not self.is_active:
+        if not self.is_connected:
             return
 
         try:
@@ -83,7 +72,7 @@ class FileDescriptorConnection(object):
             expected to be validated, since no checks are done at
             that point.
         """
-        if not self.is_active:
+        if not self.is_connected:
             raise ConnectionError("not connected")
 
         # Note the ``[:-1]`` slice -- the actual payload is excluded.
@@ -102,7 +91,7 @@ class FileDescriptorConnection(object):
 
     def recv(self):
         """Receives a packet from XenStore."""
-        if not self.is_active:
+        if not self.is_connected:
             raise ConnectionError("not connected")
 
         try:
@@ -143,7 +132,7 @@ class UnixSocketConnection(FileDescriptorConnection):
         self.path = path
 
     def connect(self):
-        if self.is_active:
+        if self.is_connected:
             return
 
         try:
@@ -184,7 +173,7 @@ class XenBusConnection(FileDescriptorConnection):
         self.path = path
 
     def connect(self):
-        if self.is_active:
+        if self.is_connected:
             return
 
         try:
