@@ -13,8 +13,10 @@ Version 0.4.0
   paths and values are specified to be 7-bit ASCII, thus it makes little
   sense to allow any Unicode string as input and then validate if it
   matches the spec.
-- Removed ``transaction`` argument from ``Client`` constructor. Please
-  use the corresponding methods explicitly.
+- Removed ``transaction`` argument from ``Client`` constructor. The user
+  is advised to use the corresponding methods explicitly.
+- Removed ``connection`` argument from ``Client`` constructor. The user
+  should now wrap it in a ``Router``.
 - Renamed some of the ``Client`` methods to more human-readable names:
 
   =================  ===================
