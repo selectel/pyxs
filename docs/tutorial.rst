@@ -7,95 +7,113 @@ Tutorial
 Basics
 ------
 
-Using :mod:`pyxs` is easy! the only class you need to import is
-:class:`~pyxs.client.Client` (unless you're up to some spooky stuff)
--- it provides a simple straightforward API to XenStore content with a
-bit of Python's syntactic sugar here and there. Generally, if you just
-need to fetch or update some XenStore items you can do::
+Using :mod:`pyxs` is easy! The only class you need to import is
+:class:`~pyxs.client.Client`. It provides a simple straightforward API
+to XenStore content with a bit of Python's syntactic sugar here and
+there.
+
+Generally, if you just need to fetch or update some XenStore items you
+can do::
 
    >>> from pyxs import Client
    >>> with Client() as c:
-   ...     c[b"/local/domain/0/name"] = b"Domain0"
+   ...     c[b"/local/domain/0/name"] = b"Ziggy"
    ...     c[b"/local/domain/0/name"]
-   b'Domain0'
+   b'Ziggy'
 
 .. note:: Even though :class:`~pyxs.client.Client` does support
           :func:`dict`-like lookups, they have nothing else in common
-          -- for instance there's no :meth:`Client.get` currently.
+          --- for instance there's no :meth:`Client.get` currently.
 
+# TODO: with-, connect and close
 
 Transactions
 ------------
 
 If you're already familiar with XenStore features, you probably know
-that it has basic transaction support. Transactions allow you to operate
-on a separate, isolated copy of XenStore tree and merge your changes
-back atomically on commit. Keep in mind, however, that **changes made
-inside a transaction aren't available to other XenStore clients unless
-you commit them**. Here's an example::
+that it implements transactions. Transactions allow you to operate on
+an isolated copy of XenStore tree and merge your changes back
+atomically on commit. Keep in mind, however, that changes made
+within a transaction become available to other XenStore clients only
+if and when committed.  Here's an example::
 
-    >>> c = Client()
-    >>> with c.transaction() as t:
-    ...    t[b"/foo/bar"] = b"baz"
-    ...    t.transaction_end(commit=True)
-    ...
-    >>> c[b"/foo/bar"]
+    >>> with Client() as c:
+    ...     c.transaction()
+    ...     c[b"/foo/bar"] = b"baz"
+    ...     c.commit()  # !
+    ...     print(c[b"/foo/bar"])
     b'baz'
 
-The second line inside ``with`` statement is completely optional,
-since the default behaviour is to commit everything on context manager
-exit. You can also abort the current transaction by calling
-:meth:`~pyxs.client.Client.transaction_end` with ``commit=False``.
+The line with the exclamation mark is a bit careless, because it
+ignores the fact that committing a transaction might fail. A more
+robust way to commit a transaction is by using a loop::
+
+    >>> with Client() as c:
+    ...     success = False
+    ...     while not success:
+    ...         c.transaction()
+    ...         c[b"/foo/bar"] = b"baz"
+    ...         success = c.commit()
+
+You can also abort the current transaction by calling
+:meth:`~pyxs.client.Client.rollback`.
+
+# TODO: atomic
 
 
 Events
 ------
 
 When a new path is created or an existing path is modified, XenStore
-fires an event, notifying all watchers that a change has been made. To
-watch a path, you have to call :meth:`~pyxs.client.Client.watch`
-with a path you want to watch and a token, unique for that path
-within the active transaction. After that, incoming events can be
-fetched by calling :meth:`~pyxs.client.Client.wait`::
+fires an event, notifying all watching clients that a change has been
+made.  :mod:`pyxs` implements watching via the :class:`Monitor`
+class. To watch a path create a monitor
+:meth:`~pyxs.client.Client.monitor` and call
+:meth:`~pyxs.client.Monitor.watch` with a path you want to watch and a
+unique token. Right after that the monitor will start to accumulate
+incoming events.  You can iterate over them via
+:meth:`~pyxs.client.Monitor.wait`::
 
     >>> with Client() as c:
-    ...    c.watch(b"/foo/bar", b"a unique token")
-    ...    c.wait()
+    ...    m = c.monitor()
+    ...    m.watch(b"/foo/bar", b"a unique token")
+    ...    next(m.wait())
     Event(b"/foo/bar", b"a unique token")
 
-XenStore also has a notion of `special` paths, which are reserved for
-special occasions:
+XenStore has a notion of *special* paths, which start with ``@`` and
+are reserved for special occasions:
 
-    ================  ================================================
-    Path              Description
-    ----------------  ------------------------------------------------
-    @introduceDomain  Fired when a **new** domain is introduced to
-                      XenStore -- you can also introduce domains
-                      yourself with a
-                      :meth:`~pyxs.client.Client.introduce_domain`
-                      call, but in most of the cases, ``xenstored``
-                      will do that for you.
-    @releaseDomain    Fired when XenStore is no longer communicating
-                      with a domain, see
-                      :meth:`~pyxs.client.Client.release_domain`.
-    ================  ================================================
+================  ================================================
+Path              Description
+----------------  ------------------------------------------------
+@introduceDomain  Fired when a **new** domain is introduced to
+                  XenStore -- you can also introduce domains
+                  yourself with a
+                  :meth:`~pyxs.client.Client.introduce_domain`
+                  call, but in most of the cases, ``xenstored``
+                  will do that for you.
+@releaseDomain    Fired when XenStore is no longer communicating
+                  with a domain, see
+                  :meth:`~pyxs.client.Client.release_domain`.
+================  ================================================
 
-Events for both `special` and ordinary paths are simple two element
+Events for both special and ordinary paths are simple two element
 tuples, where the first element is always `event target` -- a path
-which triggered the event and second is a token, you've passed to
-:meth:`~pyxs.client.Client.watch`. A nasty consequence of this is that
-you can't get `domid` of the domain, which triggered
-``@introduceDomain`` or ``@releaseDomain`` from the received event.
+which triggered the event and second is a token passed to
+:meth:`~pyxs.client.Monitor.watch`. A rather unfortunate consequence
+of this is that you can't get `domid` of the domain, which triggered
+@introduceDomain or @releaseDomain from the received event.
 
 
-Y U SO LAZY DAWG
-----------------
+Compatibility API
+-----------------
 
-:mod:`pyxs` also provides a compatibility interface, which copies the
-ones of ``xen.lowlevel.xs`` -- so you don't have to change **anything**
-in the code to switch to :mod:`pyxs`::
+:mod:`pyxs` also provides a compatibility interface, which mimics that
+of ``xen.lowlevel.xs`` --- so you don't have to change
+anything in the code to switch to :mod:`pyxs`::
 
    >>> from pyxs import xs
-   >>> xs = xs()
-   >>> xs.read(0, b"/local/domain/0/name")
-   v'Domain0'
+   >>> handle = xs()
+   >>> handle.read("0", b"/local/domain/0/name")
+   b'Domain-0'
+   >>> handle.close()
