@@ -5,11 +5,12 @@ Here you can see the full list of changes between each pyxs release.
 
 Version 0.4.0
 -------------
+
 - Fixed a bug in ``Client.set_permissions`` which coerced permission
   lists (e.g. ``["b0"]``) to repr-strings prior to validation.
 - The API is now based around ``bytes``, which means that all methods
   which used to accept ``str`` (or text) now require ``bytes``. XenStore
-  paths and values are specfified to be 7-bit ASCII, thus it makes little
+  paths and values are specified to be 7-bit ASCII, thus it makes little
   sense to allow any Unicode string as input and then validate if it
   matches the spec.
 - Removed ``transaction`` argument from ``Client`` constructor. Please
@@ -28,11 +29,11 @@ Version 0.4.0
   =================  ===================
 - Removed ``Client.transaction`` context manager, because it didn't provide
   a way to handle possible commit failure.
-- Added ``Client.exists`` for one-line path existance checks. See PR #6 on
+- Added ``Client.exists`` for one-line path existence checks. See PR #6 on
   GitHub. Thanks to Sandeep Murthy.
 - Removed implicit reconnection logic from ``FileDescriptorConnection``.
   The user is now expected to connect manually.
-- Changed ``XenBusConnection`` to prefere ``/dev/xen/xenbus`` on Linux
+- Changed ``XenBusConnection`` to prefer ``/dev/xen/xenbus`` on Linux
   due to a possible deadlock in XenBus backend.
 - Disallowed calling ``Client.monitor`` over ``XenBusConnection``. See
   http://lists.xen.org/archives/html/xen-devel/2016-02/msg03816 for
@@ -86,4 +87,4 @@ Initial release, released on July 16th 2011
   to match the scheme from the wire protocol specification.
 - Added two connection backends -- ``XenBusConnection`` for connecting
   from DomU through a block device and ``UnixSocketConnection``,
-  communicating with ``xenstored`` via a Unix domain socket.
+  communicating with XenStore via a Unix domain socket.
