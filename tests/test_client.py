@@ -341,6 +341,7 @@ def test_transaction_commit_retry(client):
     writer()
     client[b"/foo/bar"] = b"boo"
     assert not client.commit()
+    assert client.tx_id == 0
 
 
 @virtualized

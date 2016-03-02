@@ -550,13 +550,14 @@ class Client(object):
         self.ack(Op.TRANSACTION_END, b"F" + NUL)
         self.tx_id = 0
 
-    def commit(self, commit=True):
+    def commit(self):
         """Commits a transaction currently in progress.
 
-        :returns bool: ``False`` if there were intervening writes and
-                       ``True`` otherwise. The caller is responsible
-                       for repeating all operations and re-committing
-                       the transaction.
+        :returns bool: ``False`` if commit failed because of the
+                       intervening writes and ``True`` otherwise. In any
+                       case transaction is invalidated. The caller is
+                       responsible for starting a new transaction, repeating
+                       all of the operations a re-committing.
 
         .. versionchanged: 0.4.0
 
@@ -573,8 +574,9 @@ class Client(object):
 
             raise
         else:
-            self.tx_id = 0
             return True
+        finally:
+            self.tx_id = 0
 
     def monitor(self):
         """Returns a new :class:`Monitor` instance, which is currently
