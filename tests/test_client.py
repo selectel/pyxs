@@ -4,7 +4,8 @@ from __future__ import absolute_import
 
 import errno
 import sys
-from threading import Timer
+from itertools import islice
+from threading import Timer, Thread, current_thread
 
 import pytest
 
@@ -12,7 +13,7 @@ from pyxs.client import RVar, Router, Client
 from pyxs.connection import UnixSocketConnection, XenBusConnection
 from pyxs.exceptions import InvalidPath, InvalidPermission, \
     UnexpectedPacket, PyXSError
-from pyxs._internal import NUL, Op, Packet
+from pyxs._internal import NUL, Op, Event, Packet
 
 from . import virtualized
 
@@ -261,41 +262,6 @@ def test_is_domain_introduced(client):
 
 
 @virtualized
-def test_monitor(client):
-    if isinstance(client.router.connection, XenBusConnection):
-        # http://lists.xen.org/archives/html/xen-users/2016-02/msg00159.html
-        pytest.xfail("unsupported connection")
-
-    client.write(b"/foo/bar", b"baz")
-    m = client.monitor()
-    m.watch(b"/foo/bar", b"boo")
-
-    waiter = m.wait()
-    # a) we receive the first event immediately, so `next` doesn't
-    #    block.
-    assert next(waiter) == (b"/foo/bar", b"boo")
-
-    # b) before the second call we have to make sure someone
-    #    will change the path being watched.
-    Timer(.1, lambda: client.write(b"/foo/bar", b"baz")).run()
-    assert next(waiter) == (b"/foo/bar", b"boo")
-
-    # c) changing a children of the watched path triggers watch
-    #    event as well.
-    Timer(.1, lambda: client.write(b"/foo/bar/baz", b"???")).run()
-    assert next(waiter) == (b"/foo/bar/baz", b"boo")
-
-
-@pytest.mark.parametrize("op", ["watch", "unwatch"])
-def test_check_watch_path(op):
-    with pytest.raises(InvalidPath):
-        getattr(Client().monitor(), op)(b"INVALID%PATH", b"token")
-
-    with pytest.raises(InvalidPath):
-        getattr(Client().monitor(), op)(b"@arbitraryPath", b"token")
-
-
-@virtualized
 def test_transaction(client):
     assert client.tx_id == 0
     client.transaction()
@@ -366,11 +332,48 @@ def test_uncommitted_transaction():
             c.transaction()
 
 
+def xfail_if_xenbus(client):
+    if isinstance(client.router.connection, XenBusConnection):
+        # http://lists.xen.org/archives/html/xen-users/2016-02/msg00159.html
+        pytest.xfail("unsupported connection")
+
+
+@virtualized
+def test_monitor(client):
+    xfail_if_xenbus(client)
+
+    client.write(b"/foo/bar", b"baz")
+    m = client.monitor()
+    m.watch(b"/foo/bar", b"boo")
+
+    waiter = m.wait()
+    # a) we receive the first event immediately, so `next` doesn't
+    #    block.
+    assert next(waiter) == (b"/foo/bar", b"boo")
+
+    # b) before the second call we have to make sure someone
+    #    will change the path being watched.
+    Thread(target=lambda: client.write(b"/foo/bar", b"baz")).start()
+    assert next(waiter) == (b"/foo/bar", b"boo")
+
+    # c) changing a children of the watched path triggers watch
+    #    event as well.
+    Thread(target=lambda: client.write(b"/foo/bar/baz", b"???")).start()
+    assert next(waiter) == (b"/foo/bar/baz", b"boo")
+
+
+@pytest.mark.parametrize("op", ["watch", "unwatch"])
+def test_check_watch_path(op):
+    with pytest.raises(InvalidPath):
+        getattr(Client().monitor(), op)(b"INVALID%PATH", b"token")
+
+    with pytest.raises(InvalidPath):
+        getattr(Client().monitor(), op)(b"@arbitraryPath", b"token")
+
+
 @virtualized
 def test_monitor_leftover_events(client):
-    if isinstance(client.router.connection, XenBusConnection):
-        # http://lists.xen.org/archives/html/xen-devel/2016-02/msg03816.html
-        pytest.xfail("unsupported connection")
+    xfail_if_xenbus(client)
 
     with client.monitor() as m:
         m.watch(b"/foo/bar", b"boo")
@@ -379,9 +382,56 @@ def test_monitor_leftover_events(client):
             for i in range(128):
                 client[b"/foo/bar"] = str(i).encode()
 
-        Timer(.1, writer).run()
+        t = Timer(.25, writer)
+        t.start()
         m.unwatch(b"/foo/bar", b"boo")
         assert not m.events.empty()
+        t.join()
+
+
+class Latch(object):
+    def __init__(self, initial):
+        self.value = initial
+
+    def ready(self):
+        self.value -= 1
+        while self.value:
+            pass  # Spin.
+
+
+@virtualized
+def test_multiple_monitors(client):
+    xfail_if_xenbus(client)
+
+    n_events = 5
+    events = {}
+
+    latch = Latch(2 + 1)
+
+    def monitor_and_check(token):
+        with client.monitor() as m:
+            m.watch(b"/foo/bar", token)
+            latch.ready()
+            events[current_thread().ident] = list(islice(m.wait(), n_events))
+
+    t1 = Thread(target=monitor_and_check, args=(b"boo", ))
+    t1.start()
+    t2 = Thread(target=monitor_and_check, args=(b"baz", ))
+    t2.start()
+
+    latch.ready()
+    for i in range(n_events):
+        client[b"/foo/bar"] = str(i).encode()
+
+    t1.join()
+    t2.join()
+
+    assert len(events) == 2
+    events1 = events[t1.ident]
+    events2 = events[t2.ident]
+    assert len(events1) == len(events2) == n_events
+    assert set(events1) == set([Event(b"/foo/bar", b"boo")])
+    assert set(events2) == set([Event(b"/foo/bar", b"baz")])
 
 
 @virtualized
