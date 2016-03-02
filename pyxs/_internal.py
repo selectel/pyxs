@@ -52,7 +52,7 @@ Event = namedtuple("Event", "path token")
 class Packet(namedtuple("_Packet", "op rq_id tx_id size payload")):
     """A single message to or from XenStore.
 
-    :param int op: an item from :data:`Op`, representing
+    :param int op: an item from :data:`~pyxs._internal.Op`, representing
                    operation, performed by this packet.
     :param bytes payload: packet payload, should be a valid ASCII-string
                           with characters between ``[0x20; 0x7f]``.

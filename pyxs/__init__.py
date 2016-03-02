@@ -47,8 +47,9 @@ from ._compat import xs, Error
 
 @contextmanager
 def monitor(*args, **kwargs):
-    """A simple shortcut for creating :class:`Monitor` instances.
-    All arguments are forwared to :class:`Client` constructor.
+    """A simple shortcut for creating :class:`~pyxs.client.Monitor`
+    instances. All arguments are forwared to :class:`~pyxs.client.Client`
+    constructor.
     """
     with Client(*args, **kwargs) as c:
         with c.monitor() as m:

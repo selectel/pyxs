@@ -68,7 +68,7 @@ class Router(object):
        1. A router is equipped with a :func:`socket.socketpair`. The
           reader-end of the pair is selected in the mainloop alongside
           the XenStore connection, while the writer-end is used in
-          :meth:`terminate` to force-stop the mainloop.
+          :meth:`~pyxs.client.Router.terminate` to force-stop the mainloop.
        2. All operations with :class:`threading.Condition` variables user
           a 1 second timeout. This "hack" is only relevant for Python
           prior to 3.2 which didn't allow to interrupt lock acquisitions.
@@ -185,31 +185,21 @@ class RVar:
 class Client(object):
     """XenStore client.
 
-    :param str xen_bus_path: path to XenBus device, implies that
-                             :class:`~pyxs.connection.XenBusConnection`
-                             is used as a backend.
     :param str unix_socket_path: path to XenStore Unix domain socket,
-        usually something like ``/var/run/xenstored/socket`` -- implies
-        that :class:`~pyxs.connection.UnixSocketConnection` is used
-        as a backend.
+        usually something like ``/var/run/xenstored/socket``.
+    :param str xen_bus_path: path to XenBus device.
 
-    .. note:: :class:`~pyxs.connection.UnixSocketConnection` is used
-              as a fallback value, if backend cannot be determined
-              from arguments given.
-
-    Here's a quick example:
-
-    >>> with Client() as c:
-    ...     c.write(b"/foo/bar", b"baz")
-    ...     print(c.read(b"/foo/bar"))
-    b'baz'
+    If ``unix_socket_path`` is given or :class:`~pyxs.client.Client`
+    was created with no arguments, XenStore is accessed via
+    :class:`~pyxs.connection.UnixSocketConnection`; otherwise,
+    :class:`~pyxs.connection.XenBusConnection` is used.
 
     .. note::
 
-       Each client has a :class:`Router` thread running in the
-       background. Always finalize the client either explicitly by calling
-       :meth:`Client.close` or implicitly via a context manager
-       to prevent data loss.
+       Each client has a :class:`~pyxs.client.Router` thread running
+       in the background. Always finalize the client either explicitly
+       by calling :meth:`~pyxs.client.Client.close` or implicitly via
+       a context manager to prevent data loss.
 
     .. seealso::
 
@@ -580,7 +570,7 @@ class Client(object):
 
     def monitor(self):
         """Returns a new :class:`Monitor` instance, which is currently
-        *the only way* of doing PUBSUB.
+        the only way of doing PUBSUB.
 
         The monitor shares the router with its parent client. Thus closing
         the client invalidates the monitor. Closing the monitor, on the
@@ -588,7 +578,8 @@ class Client(object):
 
         .. note::
 
-           Using :meth:`monitor` over :class`XenBusConnection` is currently
+           Using :meth:`monitor` over
+           :class:`~pyxs.connection.XenBusConnection` is currently
            unsupported, because XenBus does not obey XenStore protocol
            specification. See `xen-devel`_ discussion for details.
 

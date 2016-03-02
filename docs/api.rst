@@ -4,18 +4,47 @@
 API reference
 =============
 
-.. automodule:: pyxs.client
-    :members:
+Client and Monitor
+------------------
 
-.. automodule:: pyxs.connection
-    :members:
+.. autoclass:: pyxs.client.Client
+   :members:
 
-.. automodule:: pyxs.helpers
-    :members:
+.. autoclass:: pyxs.client.Monitor
+   :members:
 
-.. automodule:: pyxs.exceptions
-    :members:
+.. autofunction:: pyxs.monitor
 
-.. automodule:: pyxs._internal
-    :members:
-    :exclude-members: Event
+Exceptions
+----------
+
+.. autoclass:: pyxs.exceptions.PyXSError
+
+.. autoclass:: pyxs.exceptions.InvalidOperation
+
+.. autoclass:: pyxs.exceptions.InvalidPayload
+
+.. autoclass:: pyxs.exceptions.InvalidPath
+
+.. autoclass:: pyxs.exceptions.InvalidPermission
+
+.. autoclass:: pyxs.exceptions.ConnectionError
+
+.. autoclass:: pyxs.exceptions.UnexpectedPacket
+
+Internals
+---------
+
+.. autoclass:: pyxs.client.Router
+   :members:
+
+.. autoclass:: pyxs.connection.FileDescriptorConnection
+   :members:
+
+.. autoclass:: pyxs.connection.XenBusConnection
+
+.. autoclass:: pyxs.connection.UnixSocketConnection
+
+.. autoclass:: pyxs._internal.Packet
+
+.. autodata:: pyxs._internal.Op
