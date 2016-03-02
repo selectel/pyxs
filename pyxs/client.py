@@ -86,6 +86,14 @@ class Router(object):
         self.rvars = {}
         self.monitors = defaultdict(list)
 
+        # Router thread is daemonic to prevent blocking in case
+        # the client wasn't finilzed properly, e.g. unhandled
+        # exception outside of ``with``. As a result, we cannot
+        # guarantee data integrity unless either ``close`` or
+        # ``__exit__`` was closed.
+        self.thread = threading.Thread(target=self)
+        self.thread.daemon = True
+
     def __repr__(self):
         return "Router({0})".format(self.connection)
 
@@ -141,6 +149,18 @@ class Router(object):
             self.connection.send(packet)
             return rvar
 
+    def start(self):
+        """Starts the router thread.
+
+        Does nothing if the router is already started.
+        """
+        if not self.thread.is_alive():
+            self.thread.start()
+
+        while not self.is_connected:
+            if not self.thread.is_alive():
+                raise ConnectionError("router died")
+
     def terminate(self):
         """Terminates the router.
 
@@ -150,6 +170,9 @@ class Router(object):
         if self.is_connected:
             self.connection.close()
             self.w_terminator.sendall(NUL)
+
+        if self.thread.is_alive():
+            self.thread.join()
 
 
 class RVar:
@@ -187,8 +210,7 @@ class RVar:
 class Client(object):
     """XenStore client.
 
-    :param str unix_socket_path: path to XenStore Unix domain socket,
-        usually something like ``/var/run/xenstored/socket``.
+    :param str unix_socket_path: path to XenStore Unix domain socket.
     :param str xen_bus_path: path to XenBus device.
 
     If ``unix_socket_path`` is given or :class:`~pyxs.client.Client`
@@ -196,11 +218,28 @@ class Client(object):
     :class:`~pyxs.connection.UnixSocketConnection`; otherwise,
     :class:`~pyxs.connection.XenBusConnection` is used.
 
-    .. note::
+    Each client has a :class:`~pyxs.client.Router` thread running
+    in the background. The goal of the router is to multiplex
+    requests from different transaction through a single XenStore
+    connection.
 
-       Each client has a :class:`~pyxs.client.Router` thread running
-       in the background. Always finalize the client either explicitly
-       by calling :meth:`~pyxs.client.Client.close` or implicitly via
+    .. versionchanged:: 0.4.0
+
+       The constructor no longer accepts ``connection`` argument. If
+       you wan't to force the use of a specific connection class, wrap
+       it in a :class:`~pyxs.client.Router`::
+
+            from pyxs import Router, Client
+            from pyxs.connection import XenBusConnection
+
+            router = Router(XenBusConnection())
+            with Client(router=router) as c:
+                do_something(c)
+
+    .. warning::
+
+       Always finalize the client either explicitly by calling
+       :meth:`~pyxs.client.Client.close` or implicitly via
        a context manager to prevent data loss.
 
     .. seealso::
@@ -216,8 +255,7 @@ class Client(object):
     except (IOError, OSError):
         SU = False
 
-    def __init__(self, unix_socket_path=None, xen_bus_path=None,
-                 router=None, router_thread=None):
+    def __init__(self, unix_socket_path=None, xen_bus_path=None, router=None):
         if router is None:
             if unix_socket_path or not xen_bus_path:
                 connection = UnixSocketConnection(unix_socket_path)
@@ -225,25 +263,15 @@ class Client(object):
                 connection = XenBusConnection(xen_bus_path)
 
             router = Router(connection)
-        if router_thread is None:
-            # Router thread is daemonic to prevent blocking in case
-            # the client wasn't finilzed properly, e.g. unhandled
-            # exception outside of ``with``. As a result, we cannot
-            # guarantee data integrity unless either ``close`` or
-            # ``__exit__`` was closed.
-            router_thread = threading.Thread(target=router)
-            router_thread.daemon = True
 
         self.router = router
-        self.router_thread = router_thread
         self.tx_id = 0
 
     def __repr__(self):
         return "Client({0})".format(self.router.connection)
 
     def __copy__(self):
-        return self.__class__(router=self.router,
-                              router_thread=self.router_thread)
+        return self.__class__(router=self.router)
 
     def __enter__(self):
         self.connect()
@@ -291,11 +319,7 @@ class Client(object):
                      as a context manager to make sure the client is
                      properly finalized.
         """
-        self.router_thread.start()
-
-        while not self.router.is_connected:
-            if not self.router_thread.is_alive():
-                raise ConnectionError("router died")
+        self.router.start()
 
     def close(self):
         """Finalizes the client.
@@ -305,7 +329,6 @@ class Client(object):
                      properly finalized.
         """
         self.router.terminate()
-        self.router_thread.join()
 
     def read(self, path, default=None):
         """Reads data from a given path.

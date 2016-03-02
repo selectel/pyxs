@@ -30,28 +30,28 @@ def test_init():
     c = Client()
     assert c.tx_id == 0
     assert isinstance(c.router.connection, UnixSocketConnection)
-    assert not c.router_thread.is_alive()
+    assert not c.router.thread.is_alive()
 
     c = Client(unix_socket_path="/var/run/xenstored/socket")
     assert isinstance(c.router.connection, UnixSocketConnection)
-    assert not c.router_thread.is_alive()
+    assert not c.router.thread.is_alive()
 
     # b) XenBusConnection
     c = Client(xen_bus_path="/dev/xen/xenbus")
     assert isinstance(c.router.connection, XenBusConnection)
-    assert not c.router_thread.is_alive()
+    assert not c.router.thread.is_alive()
 
 
 @virtualized
 def test_context_manager():
     # a) no transaction is running
     c = Client()
-    assert not c.router_thread.is_alive()
+    assert not c.router.thread.is_alive()
 
     with c:
-        assert c.router_thread.is_alive()
+        assert c.router.thread.is_alive()
 
-    assert not c.router_thread.is_alive()
+    assert not c.router.thread.is_alive()
 
 
 @virtualized
