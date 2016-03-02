@@ -56,11 +56,11 @@ def error(smth):
 
     >>> error(22)
     pyxs.exceptions.PyXSError: (22, 'Invalid argument')
-    >>> error("EINVAL")
+    >>> error(b"EINVAL")
     pyxs.exceptions.PyXSError: (22, 'Invalid argument')
     """
     if isinstance(smth, bytes):
-        smth = _codeerror.get(smth.decode("utf-8"), 0)
+        smth = _codeerror.get(smth.decode(), 0)
 
     return PyXSError(smth, os.strerror(smth))
 

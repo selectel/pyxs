@@ -21,21 +21,26 @@ can do::
    ...     c[b"/local/domain/0/name"]
    b'Ziggy'
 
-.. note:: Even though :class:`~pyxs.client.Client` does support
-          :func:`dict`-like lookups, they have nothing else in common
-          --- for instance there's no :meth:`Client.get` currently.
+Using :class:`~pyxs.client.Client` without the ``with`` statement is
+possible, albeit, not recommended:
 
-# TODO: with-, connect and close
+  >>> c = Client()
+  >>> c.connect()
+  >>> c[b"/local/domain/0/name"] = b"It works!"
+  >>> c.close()
+
+The reason for preferring a context manager is simple: you don't have
+to DIY. The context manager will make sure that a started transaction
+was either rolled back or committed and close the underlying XenStore
+connection afterwards.
 
 Transactions
 ------------
 
-If you're already familiar with XenStore features, you probably know
-that it implements transactions. Transactions allow you to operate on
-an isolated copy of XenStore tree and merge your changes back
-atomically on commit. Keep in mind, however, that changes made
-within a transaction become available to other XenStore clients only
-if and when committed.  Here's an example::
+Transactions allow you to operate on an isolated copy of XenStore tree
+and merge your changes back atomically on commit. Keep in mind, however,
+that changes made within a transaction become available to other XenStore
+clients only if and when committed.  Here's an example::
 
     >>> with Client() as c:
     ...     c.transaction()
@@ -44,7 +49,7 @@ if and when committed.  Here's an example::
     ...     print(c[b"/foo/bar"])
     b'baz'
 
-The line with the exclamation mark is a bit careless, because it
+The line with an exclamation mark is a bit careless, because it
 ignores the fact that committing a transaction might fail. A more
 robust way to commit a transaction is by using a loop::
 
@@ -59,7 +64,6 @@ You can also abort the current transaction by calling
 :meth:`~pyxs.client.Client.rollback`.
 
 # TODO: atomic
-
 
 Events
 ------
