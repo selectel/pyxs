@@ -14,9 +14,8 @@
 What is ``pyxs``?
 -----------------
 
-What is ``pyxs``? It's a pure Python XenStore client implementation, which
-coveres all of the ``libxs`` features and adds some nice Pythonic sugar on
-top of it.
+It's a pure Python XenStore client implementation, which covers all of the
+``libxs`` features and adds some nice Pythonic sugar on top of it.
 
 Installation
 ------------

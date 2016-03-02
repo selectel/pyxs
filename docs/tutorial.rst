@@ -63,8 +63,6 @@ robust way to commit a transaction is by using a loop::
 You can also abort the current transaction by calling
 :meth:`~pyxs.client.Client.rollback`.
 
-# TODO: atomic
-
 Events
 ------
 
