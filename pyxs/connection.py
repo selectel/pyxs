@@ -6,7 +6,9 @@
     This module implements two connection backends for
     :class:`~pyxs.client.Client`.
 
-    :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
+    :copyright: (c) 2011 by Selectel.
+    :copyright: (c) 2016 by pyxs authors and contributors, see AUTHORS
+                for more details.
     :license: LGPL, see LICENSE for more details.
 """
 

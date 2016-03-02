@@ -3,11 +3,13 @@
     pyxs.client
     ~~~~~~~~~~~
 
-    This module implements XenStore client, which uses multiple connection
-    options for communication: :class:`.connection.UnixSocketConnection`
-    and :class:`.connection.XenBusConnection`.
+    This module implements XenStore client, which can communicate with
+    XenStore either via: :class:`~pyxs.connection.UnixSocketConnection`
+    or :class:`~pyxs.connection.XenBusConnection`.
 
-    :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
+    :copyright: (c) 2011 by Selectel.
+    :copyright: (c) 2016 by pyxs authors and contributors, see AUTHORS
+                for more details.
     :license: LGPL, see LICENSE for more details.
 """
 
@@ -429,8 +431,8 @@ class Client(object):
             yield top, value, children
 
     def get_domain_path(self, domid):
-        """Returns the domain's base path, as is used for relative
-        transactions: ex: ``"/local/domain/<domid>"``. If a given
+        """Returns the domain's base path, as used for relative
+        requests: e.g. ``b"/local/domain/<domid>"``. If a given
         `domid` doesn't exists the answer is undefined.
 
         :param int domid: domain to get base path for.

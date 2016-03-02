@@ -17,11 +17,9 @@ What is ``pyxs``?
 It's a pure Python XenStore client implementation, which covers all of the
 ``libxs`` features and adds some nice Pythonic sugar on top of it.
 
-You might be thinking `"Okay, but is it any good?"`
+You might be thinking "Okay, but is it any good?" **Yes!**
 
-Yes!
-
-* ``pyxs`` supports both Python 2 and 3
+* ``pyxs`` supports both Python 2 and 3,
 * works over a Unix socket or XenBus,
 * has a clean and well-documented API,
 * is writen in easy to understand Python,
@@ -31,7 +29,11 @@ Yes!
 Installation
 ------------
 
-If you have `pip <https://pip.pypa.io/en/stable>`_ you can do the usual
-``pip install pyxs``. Otherwise, download the source from
-`GitHub <https://github.com/selectel/pyxs>`_ and run
-``python setup.py install``.
+If you have `pip <https://pip.pypa.io/en/stable>`_ you can do the usual::
+
+    pip install --user pyxs
+
+Otherwise, download the source from `GitHub <https://github.com/selectel/pyxs>`_
+and run::
+
+    python setup.py install

@@ -6,7 +6,9 @@
     This module implements compatibility interface for scripts,
     using ``xen.lowlevel.xs``.
 
-    :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
+    :copyright: (c) 2011 by Selectel.
+    :copyright: (c) 2016 by pyxs authors and contributors, see AUTHORS
+                for more details.
     :license: LGPL, see LICENSE for more details.
 """
 
