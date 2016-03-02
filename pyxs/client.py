@@ -411,10 +411,7 @@ class Client(object):
         :param bytes top: node to start from.
         :param bool topdown: see :func:`os.walk` for details.
         """
-        try:
-            children = self.list(top)
-        except PyXSError:
-            return
+        children = self.list(top)
 
         try:
             value = self.read(top)

@@ -9,18 +9,16 @@
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
 """
 
-from pyxs import monitor
+import pyxs
 
+with pyxs.monitor() as m:
+    m.watch(b"@introduceDomain", b"unused")
+    m.watch(b"@releaseDomain", b"unused")
 
-with monitor() as m:
-    m.watch(b"@introduceDomain", b"introduced")
-    m.watch(b"@releaseDomain", b"released")
-
-    _, token = m.wait(sleep=.1)
-
-    # Funny thing is -- XenStored doesn't send us domid of the
-    # event target, so we have to get it manually, via ``xc``.
-    if token == b"introduced":
-        print("Hey, we got a new domain here!")
-    else:
-        print("Ooops, we lost him ...")
+    for wpath, _token in m.wait():
+        # Funny thing is -- XenStored doesn't send us domid of the
+        # event target, so we have to get it manually, via ``xc``.
+        if wpath == b"@introduceDomain":
+            print("Hey, we got a new domain here!")
+        else:
+            print("Ooops, we lost him ...")

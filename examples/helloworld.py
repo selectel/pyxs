@@ -5,31 +5,32 @@
 
     A minimal working example, showing :mod:`pyxs` API usage.
 
-    :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
+    :copyright: (c) 2016 by pyxs authors and contributors,
+                    see AUTHORS for more details.
 """
 
-from __future__ import unicode_literals, print_function
+from __future__ import print_function
 
 from pyxs import Client, PyXSError
 
 
-def run(**kwargs):
-    with Client(**kwargs) as c:
+if __name__ == "__main__":
+    with Client() as c:
         # a) write-read.
-        c.write(b"/foo/bar", b"baz")
-        print(c.read(b"/foo/bar"))  # ==> "baz"
+        c[b"/foo/bar"] = b"baz"
+        print(c[b"/foo/bar"])  # ==> "baz"
 
         # b) exceptions! let's try to read a non-existant path.
         try:
-            c.read(b"/path/to/something/useless")
+            c[b"/path/to/something/useless"]
         except PyXSError as e:
             print(e)
 
         # c) okay, time to delete that /foo/bar path.
-        c.rm(b"/foo/bar")
+        del c[b"/foo/bar"]
 
         try:
-            c.read(b"/foo/bar")
+            c[b"/foo/bar"]
         except PyXSError as e:
             print("`/foo/bar` is no moar!")
 
@@ -37,35 +38,29 @@ def run(**kwargs):
         c.mkdir(b"/foo/bar")
         c.mkdir(b"/foo/baz")
         c.mkdir(b"/foo/boo")
-        print("Here's what `/foo` has: ", c.ls(b"/foo"))
-        print(c.get_permissions(b"/foo"))
+        print("Here's what `/foo` has: ", c.list(b"/foo"))
+        print(c.get_perms(b"/foo"))
 
         # e) let's watch some paths!
         c.write(b"/foo/bar", b"baz")
         with c.monitor() as m:
             m.watch(b"/foo/bar", b"baz")
-            print("Watching ... do `$ xenstore-write /foo/bar <anything>`.")
-            print(m.wait())
+            print("Watching ... do ``xenstore-write /foo/bar <anything>``.")
+            print(next(m.wait()))  # 1st.
+            print(next(m.wait()))  # 2nd.
             m.unwatch(b"/foo/bar", b"baz")
 
-        # f) domain managment commands.
+        # f) domain management commands.
         print(c.get_domain_path(0))
-        print(c.is_domain_introduced(0))
+        print("domain 0 introduced: ", c.is_domain_introduced(0))
 
         # g) transactions.
-        with c.transaction():
-            print("Creating a `/bar/foo` within a transaction.")
-            c.write(b"/bar/foo", b"baz")
+        print("Creating a `/bar/foo` within a transaction.")
+        while True:
+            c.transaction()
+            c[b"/bar/foo"] = b"baz"
+            if c.commit():
+                break
 
-        print("Transaction is over -- let's check it: "
-              "/bar/foo =", c.read(b"/bar/foo"))
-
-print("Using Unix domain socket connection:")
-print("------------------------------------")
-run(unix_socket_path="/var/run/xenstored/socket")
-
-print("")
-
-print("Using XenBus connection:")
-print("------------------------")
-run(xen_bus_path="/proc/xen/xenbus")
+        print("Transaction committed. Let's check it: "
+              "/bar/foo =", c[b"/bar/foo"])

@@ -8,39 +8,32 @@
     :copyright: (c) 2011 by Selectel, see AUTHORS for more details.
 """
 
-from __future__ import print_function, unicode_literals
+from __future__ import print_function
 
-import optparse
 import posixpath
+import sys
 
-from pyxs.client import Client, XenBusConnection, UnixSocketConnection
-from pyxs.exceptions import PyXSError
+from pyxs.client import Client
 
 
 def main(client, top):
-    depth = top.count(b"/")
+    # ``xenstore-ls`` doesn't render top level.
+    depth = top.count(b"/") + (top != b"/")
 
     for path, value, children in client.walk(top):
         if path == top:
             continue
 
-        node = posixpath.basename(path) or b"/"
-        print("{0}{1} = \"{2}\"".format(" " * (path.count(b"/") - depth - 1),
-                                        node, value))
+        node = posixpath.basename(path)
+        indent = " " * (path.count(b"/") - depth)
+        print("{0}{1} = \"{2}\"".format(indent, node, value))
 
 
 if __name__ == "__main__":
-    parser = optparse.OptionParser(usage="%prog [PATH]")
-    parser.add_option("--socket", action="store_true",
-                      help="connect through Unix socket, instead of XenBus.")
+    try:
+        [path] = sys.argv[1:] or ["/"]
+    except ValueError:
+        sys.exit("usage: %prog PATH")
 
-    options, args = parser.parse_args()
-
-    if options.socket:
-        connection = UnixSocketConnection()
-    else:
-        connection = XenBusConnection()
-
-    [path] = args[:1] or ["/"]
-
-    main(Client(connection=connection), path.encode("ascii"))
+    with Client() as client:
+        main(client, posixpath.normpath(path).encode())
