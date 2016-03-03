@@ -9,6 +9,8 @@
     :license: LGPL, see LICENSE for more details.
 """
 
+from __future__ import absolute_import
+
 __all__ = ["check_path", "check_watch_path", "check_perms", "error"]
 
 import errno

@@ -12,6 +12,8 @@
     :license: LGPL, see LICENSE for more details.
 """
 
+from __future__ import absolute_import
+
 __all__ = ["xs", "Error"]
 
 import errno

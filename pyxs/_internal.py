@@ -11,6 +11,8 @@
     :license: LGPL, see LICENSE for more details.
 """
 
+from __future__ import absolute_import
+
 __all__ = ["NUL", "Event", "Op", "Packet", "next_rq_id"]
 
 import struct
