@@ -175,7 +175,7 @@ class Router(object):
             self.thread.join()
 
 
-class RVar:
+class RVar(object):
     """A thread-safe shared mutable reference.
 
     .. versionadded:: 0.4.0
