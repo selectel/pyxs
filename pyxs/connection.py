@@ -77,11 +77,11 @@ class FileDescriptorConnection(object):
         if not self.is_connected:
             raise ConnectionError("not connected")
 
-        # Note the ``[:-1]`` slice -- the actual payload is excluded.
-        data = packet._struct.pack(*packet[:-1]) + packet.payload
-
+        header = Packet._struct.pack(packet.op, packet.rq_id,
+                                     packet.tx_id, packet.size)
         try:
-            writeall(self.fd, data)
+            writeall(self.fd, header)
+            writeall(self.fd, packet.payload)
         except OSError as e:
             if e.args[0] in [errno.ECONNRESET,
                              errno.ECONNABORTED,
@@ -113,7 +113,7 @@ class FileDescriptorConnection(object):
             # to check the size before reading. See
             # http://lists.xen.org/archives/html/xen-devel/2016-03/msg00229
             # for discussion.
-            payload = b"" if not size else os.read(self.fd, size)
+            payload = b"" if not size else readall(self.fd, size)
             return Packet(op, payload, rq_id, tx_id)
 
 
@@ -132,7 +132,7 @@ class UnixSocketConnection(FileDescriptorConnection):
                      environment -- similar to what ``libxs`` does.
     """
     def __init__(self, path=None):
-        self.path = _get_unix_socket_path()
+        self.path = path or _get_unix_socket_path()
 
     def connect(self):
         if self.is_connected:
