@@ -106,6 +106,8 @@ class xs:
         # Even though ``xs.watch`` docstring states that token should be
         # a string, it in fact can be any Python object. We mimic this
         # behaviour here, but it can be a source of hard to find bugs.
+        # See http://lists.xen.org/archives/html/xen-devel/2016-03/msg00228
+        # for discussion.
         stub = str(id(token)).encode()
         self.token_aliases[stub] = token
         return self.monitor.watch(path, stub)

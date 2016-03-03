@@ -109,11 +109,19 @@ class FileDescriptorConnection(object):
         else:
             op, rq_id, tx_id, size = Packet._struct.unpack(header)
 
-            # XXX XenBus seems to handle ``os.read(fd, 0)`` incorrectly,
-            # blocking unless any new data appears, so we have to check
-            # size value, before reading.
+            # On Linux XenBus blocks on ``os.read(fd, 0)``, so we have
+            # to check the size before reading. See
+            # http://lists.xen.org/archives/html/xen-devel/2016-03/msg00229
+            # for discussion.
             payload = b"" if not size else os.read(self.fd, size)
             return Packet(op, payload, rq_id, tx_id)
+
+
+def _get_unix_socket_path():
+    """Returns default path to ``xenstored`` Unix domain socket."""
+    return (os.getenv("XENSTORED_PATH") or
+            os.path.join(os.getenv("XENSTORED_RUNDIR",
+                                   "/var/run/xenstored"), "socket"))
 
 
 class UnixSocketConnection(FileDescriptorConnection):
@@ -124,14 +132,7 @@ class UnixSocketConnection(FileDescriptorConnection):
                      environment -- similar to what ``libxs`` does.
     """
     def __init__(self, path=None):
-        if path is None:
-            path = (
-                os.getenv("XENSTORED_PATH") or
-                os.path.join(os.getenv("XENSTORED_RUNDIR",
-                                       "/var/run/xenstored"), "socket")
-            )
-
-        self.path = path
+        self.path = _get_unix_socket_path()
 
     def connect(self):
         if self.is_connected:
@@ -147,32 +148,29 @@ class UnixSocketConnection(FileDescriptorConnection):
             self.fd = os.dup(sock.fileno())
 
 
+def _get_xenbus_path():
+    """Returns OS-specific path to XenBus."""
+    system = platform.system()
+    if system == "Linux" and not os.access("/dev/xen/xenbus", os.R_OK):
+        # See commit 9c89dc95201ffed5fead17b35754bf9440fdbdc0 in
+        # http://xenbits.xen.org/gitweb/?p=xen.git for details on the
+        # ``os.access`` check.
+        return "/proc/xen/xenbus"
+    elif system == "NetBSD":
+        return "/kern/xen/xenbus"
+    else:
+        return "/dev/xen/xenbus"
+
+
 class XenBusConnection(FileDescriptorConnection):
     """XenStore connection through XenBus.
 
-    :param str path: path to XenBus block device; a predefined
-                     OS-specific constant is used, if a value isn't
+    :param str path: path to XenBus. A predefined OS-specific
+                     constant is used, if a value isn't
                      provided explicitly.
     """
     def __init__(self, path=None):
-        if path is None:
-            # .. note:: it looks like OCaml-powered ``xenstored``
-            # simply ignores the possibility of being launched on a
-            # platform, different from Linux, but ``libxs``  has those
-            # constants in-place.
-            system = platform.system()
-
-            if system == "Linux" and not os.access("/dev/xen/xenbus", os.R_OK):
-                # See commit 9c89dc95201ffed5fead17b35754bf9440fdbdc0 in
-                # http://xenbits.xen.org/gitweb/?p=xen.git for details on the
-                # ``os.access`` check.
-                path = "/proc/xen/xenbus"
-            elif system == "NetBSD":
-                path = "/kern/xen/xenbus"
-            else:
-                path = "/dev/xen/xenbus"
-
-        self.path = path
+        self.path = path or _get_xenbus_path()
 
     def connect(self):
         if self.is_connected:
