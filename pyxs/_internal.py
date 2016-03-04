@@ -54,7 +54,7 @@ Event = namedtuple("Event", "path token")
 
 
 class Packet(namedtuple("_Packet", "op rq_id tx_id size payload")):
-    """A single message to or from XenStore.
+    """A message to or from XenStore.
 
     :param int op: an item from :data:`~pyxs._internal.Op`, representing
                    operation, performed by this packet.
@@ -63,14 +63,19 @@ class Packet(namedtuple("_Packet", "op rq_id tx_id size payload")):
     :param int rq_id: request id -- hopefuly a **unique** identifier
                       for this packet, XenStore simply echoes this value
                       back in reponse.
-    :param int tx_id: transaction id, defaults to ``0`` -- which means
+    :param int tx_id: transaction id, defaults to ``0`` , which means
                       no transaction is running.
+
+    .. versionchanged:: 0.4.0
+
+       ``rq_id`` no longer defaults to ``0`` and should be provided
+       explicitly.
     """
     #: ``xsd_sockmsg`` struct see ``xen/include/public/io/xs_wire.h``
     #: for details.
     _struct = struct.Struct(b"IIII")
 
-    def __new__(cls, op, payload, rq_id=None, tx_id=None):
+    def __new__(cls, op, payload, rq_id, tx_id=None):
         # Checking restrictions:
         # a) payload is limited to 4096 bytes.
         if len(payload) > 4096:
@@ -79,8 +84,8 @@ class Packet(namedtuple("_Packet", "op rq_id tx_id size payload")):
         if op not in Op:
             raise InvalidOperation(op)
 
-        return super(Packet, cls).__new__(cls,
-            op, rq_id or 0, tx_id or 0, len(payload), payload)
+        return super(Packet, cls).__new__(
+            cls, op, rq_id, tx_id or 0, len(payload), payload)
 
 
 _rq_id = -1

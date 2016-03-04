@@ -91,7 +91,7 @@ def monkeypatch_router(client, response_packet):
 @virtualized
 def test_execute_command_invalid_op():
     with Client() as c:
-        monkeypatch_router(c, Packet(Op.DEBUG, b"/local" + NUL))
+        monkeypatch_router(c, Packet(Op.DEBUG, b"/local" + NUL, rq_id=0))
 
         with pytest.raises(UnexpectedPacket):
             c.execute_command(Op.READ, b"/local" + NUL)
@@ -100,7 +100,8 @@ def test_execute_command_invalid_op():
 @virtualized
 def test_execute_command_invalid_tx_id():
     with Client() as c:
-        monkeypatch_router(c, Packet(Op.READ, b"/local" + NUL, tx_id=42))
+        monkeypatch_router(c, Packet(Op.READ, b"/local" + NUL,
+                                     rq_id=0, tx_id=42))
 
         with pytest.raises(UnexpectedPacket):
             c.execute_command(Op.READ, b"/local" + NUL)
