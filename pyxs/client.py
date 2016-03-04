@@ -168,7 +168,6 @@ class Router(object):
         Does nothing if the router was already terminated.
         """
         if self.is_connected:
-            self.connection.close()
             self.w_terminator.sendall(NUL)
 
         if self.thread.is_alive():

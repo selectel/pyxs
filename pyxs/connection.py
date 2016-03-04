@@ -53,7 +53,7 @@ class PacketConnection(object):
     def close(self, silent=True):
         """Disconnects from XenStore.
 
-        :param bool silent: if ``True`` (default), any errors, raised
+        :param bool silent: if ``True`` (default), any errors raised
                             while closing the file descriptor are
                             suppressed.
         """
