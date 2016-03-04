@@ -38,9 +38,6 @@ Internals
 .. autoclass:: pyxs.client.Router
    :members:
 
-.. autoclass:: pyxs.connection.PacketConnection
-   :members:
-
 .. autoclass:: pyxs.connection.XenBusConnection
 
 .. autoclass:: pyxs.connection.UnixSocketConnection

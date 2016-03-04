@@ -130,7 +130,7 @@ class Router(object):
         return self.connection.is_connected
 
     def subscribe(self, token, monitor):
-        """Subscribes a ``monitor`` to events with a given ``token``."""
+        """Subscribes a ``monitor`` from events with a given ``token``."""
         self.monitors[token].append(monitor)
 
     def unsubscribe(self, token, monitor):
@@ -314,18 +314,16 @@ class Client(object):
 
         .. versionadded: 0.4.0
 
-        .. warning:: This method is unsafe. Please use :class:`Client`
-                     as a context manager to make sure the client is
-                     properly finalized.
+        .. warning:: This method is unsafe. Please use client as a context
+                     manager to ensure it is properly finalized.
         """
         self.router.start()
 
     def close(self):
         """Finalizes the client.
 
-        .. warning:: This method is unsafe. Please use :class:`Client`
-                     as a context manager to make sure the client is
-                     properly finalized.
+        .. warning:: This method is unsafe. Please use client as a context
+                     manager to ensure it is properly finalized.
         """
         self.router.terminate()
 
