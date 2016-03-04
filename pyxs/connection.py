@@ -147,6 +147,7 @@ class _UnixSocketTransport(object):
         self.sock.sendall(data)
 
     def close(self):
+        self.sock.shutdown(socket.SHUT_RDWR)
         self.sock.close()
 
 
