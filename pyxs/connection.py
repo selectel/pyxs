@@ -20,6 +20,7 @@ import errno
 import os
 import platform
 import socket
+import sys
 
 from .exceptions import ConnectionError
 from ._internal import Packet
@@ -137,15 +138,23 @@ class _UnixSocketTransport(object):
     def fileno(self):
         return self.sock.fileno()
 
-    def recv(self, size):
-        view = memoryview(bytearray(size))
-        while size:
-            received = self.sock.recv_into(view[-size:])
-            if not received:
-                raise socket.error(errno.ECONNRESET)
+    if sys.version_info[:2] < (2, 7):
+        def recv(self, size):
+            chunks = []
+            while size:
+                chunks.append(self.sock.recv(size))
+                size -= len(chunks[-1])
+            return b"".join(chunks)
+    else:
+        def recv(self, size):
+            view = memoryview(bytearray(size))
+            while size:
+                received = self.sock.recv_into(view[-size:])
+                if not received:
+                    raise socket.error(errno.ECONNRESET)
 
-            size -= received
-        return view.tobytes()
+                size -= received
+            return view.tobytes()
 
     def send(self, data):
         self.sock.sendall(data)
@@ -198,15 +207,25 @@ class _XenBusTransport(object):
     def recv(self, size):
         chunks = []
         while size:
-            chunks.append(os.read(self.fd, size))
-            size -= len(chunks[-1])
+            read = os.read(self.fd, size)
+            if not read:
+                raise OSError(errno.ECONNRESET)
+
+            chunks.append(read)
+            size -= len(read)
         return b"".join(chunks)
 
-    def send(self, data):
-        size = len(data)
-        view = memoryview(data)
-        while size:
-            size -= os.write(self.fd, view[-size:])
+    if sys.version_info[:2] < (2, 7):
+        def send(self, data):
+            size = len(data)
+            while size:
+                size -= os.write(self.fd, data[-size:])
+    else:
+        def send(self, data):
+            size = len(data)
+            view = memoryview(data)
+            while size:
+                size -= os.write(self.fd, view[-size:])
 
     def close(self):
         return os.close(self.fd)
