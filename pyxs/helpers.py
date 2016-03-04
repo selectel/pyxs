@@ -26,32 +26,6 @@ _codeerror = dict((message, code)
                   for code, message in errno.errorcode.items())
 
 
-def writeall(fd, data):
-    """Writes data to the file descriptor.
-
-    Calls :func:`os.write` repeatedly unilt all data is written.
-    If an error occurs, it's impossible to tell how much data has
-    been written.
-    """
-    length = len(data)
-    while length:
-        length -= os.write(fd, data[-length:])
-
-
-def readall(fd, length):
-    """Reads data of a given length from the file descriptor.
-
-    Calls :func:`os.read` repeatedly until all data is read. If an
-    error occurs, it's impossible to tell how much data has been read.
-    """
-    chunks = []
-    while length:
-        chunks.append(os.read(fd, length))
-        length -= len(chunks[-1])
-    else:
-        return b"".join(chunks)
-
-
 def error(smth):
     """Returns a :class:`~pyxs.exceptions.PyXSError` matching a given
     errno or error name.
