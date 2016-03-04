@@ -140,7 +140,11 @@ class _UnixSocketTransport(object):
     def recv(self, size):
         view = memoryview(bytearray(size))
         while size:
-            size -= self.sock.recv_into(view[-size:])
+            received = self.sock.recv_into(view[-size:])
+            if not received:
+                raise socket.error(errno.ECONNRESET)
+
+            size -= received
         return view.tobytes()
 
     def send(self, data):
