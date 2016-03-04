@@ -14,8 +14,8 @@
 What is ``pyxs``?
 -----------------
 
-It's a pure Python XenStore client implementation, which covers all of the
-``libxs`` features and adds some nice Pythonic sugar on top of it.
+It's a pure Python XenStore client implementation, which covers all of
+the ``libxs`` features and adds some nice Pythonic sugar on top.
 
 You might be thinking "Okay, but is it any good?" **Yes!**
 
@@ -25,6 +25,16 @@ You might be thinking "Okay, but is it any good?" **Yes!**
 * is writen in easy to understand Python,
 * can be used with `gevent <http://www.gevent.org>`_ or
   `eventlet <http://eventlet.net>`_.
+
+Here's a quick example
+
+.. code:: python
+
+   import pyxs
+
+   with pyxs.Client() as c:
+       c[b"foo/bar"] = b"boo"
+       print(c.list(b"foo"))
 
 Installation
 ------------
