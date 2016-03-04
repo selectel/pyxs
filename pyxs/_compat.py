@@ -22,7 +22,7 @@ from .client import Client
 from .exceptions import PyXSError as Error
 
 
-class xs:
+class xs(object):
     """XenStore client with a backward compatible interface, useful for
     switching from ``xen.lowlevel.xs``.
     """

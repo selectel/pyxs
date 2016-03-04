@@ -41,7 +41,7 @@ def error(smth):
     return PyXSError(smth, os.strerror(smth))
 
 
-_re_path = re.compile(b"^[a-zA-Z0-9-/_@]+\x00?$")
+_re_path = re.compile(br"^[a-zA-Z0-9-/_@]+\x00?$")
 
 
 def check_path(path):
@@ -65,7 +65,7 @@ def check_path(path):
     return path
 
 
-_re_watch_path = re.compile(b"^@(?:introduceDomain|releaseDomain)\x00?$")
+_re_watch_path = re.compile(br"^@(?:introduceDomain|releaseDomain)\x00?$")
 
 
 def check_watch_path(wpath):
@@ -83,7 +83,7 @@ def check_watch_path(wpath):
     return wpath
 
 
-_re_perms = re.compile(b"^[wrbn]\d+$")
+_re_perms = re.compile(br"^[wrbn]\d+$")
 
 
 def check_perms(perms):
