@@ -390,6 +390,26 @@ def test_monitor_leftover_events(client):
         t.join()
 
 
+@virtualized
+def test_monitor_different_tokens(client):
+    xfail_if_xenbus(client)
+
+    with client.monitor() as m:
+        m.watch(b"/foo/bar", b"boo")
+        m.watch(b"/foo/bar", b"baz")
+
+        def writer():
+            client[b"/foo/bar"] = str(i).encode()
+
+        t = Timer(.25, lambda: client.write(b"/foo/bar", "???"))
+        t.start()
+        t.join()
+
+        events = list(islice(m.wait(), 2))
+        assert len(events) == 2
+        assert set(token for wpath, token in events) == set([b"boo", b"baz"])
+
+
 class Latch(object):
     def __init__(self, initial):
         self.value = initial

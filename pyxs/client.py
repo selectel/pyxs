@@ -625,8 +625,6 @@ class Monitor(object):
     Event(...)
 
     :param Client client: a reference to the parent client.
-    :ivar dict watched: a mapping of path currently watched by the monitor
-                        to the corresponding tokens.
 
     .. note::
 
@@ -636,7 +634,7 @@ class Monitor(object):
     def __init__(self, client):
         self.client = client
         self.events = queue.Queue()
-        self.watched = {}
+        self.unwatch_queue = set()
 
     def __enter__(self):
         return self
@@ -644,9 +642,14 @@ class Monitor(object):
     def __exit__(self, *exc_info):
         self.close()
 
+    @property
+    def watched(self):
+        """A set of paths currently watched by the monitor."""
+        return set(wpath for wpath, token in self.unwatch_queue)
+
     def close(self):
         """Finalizes the monitor by unwatching all watched paths."""
-        for wpath, token in list(self.watched.items()):
+        for wpath, token in list(self.unwatch_queue):
             self.unwatch(wpath, token)
 
     def watch(self, wpath, token):
@@ -654,8 +657,10 @@ class Monitor(object):
 
         Any alteration to the watched path generates an event. This
         includes path creation, removal, contents change or permission
-        change. An event can also be triggered spuriously. Changes made
-        in transactions cause an event only if and when committed.
+        change. An event can also be triggered spuriously.
+
+        Changes made in transactions cause an event only if and when
+        committed.
 
         :param bytes wpath: path to watch.
         :param bytes token: watch token, returned in watch notification.
@@ -663,7 +668,7 @@ class Monitor(object):
         check_watch_path(wpath)
         self.client.router.subscribe(token, self)
         self.client.ack(Op.WATCH, wpath + NUL, token + NUL)
-        self.watched[wpath] = token
+        self.unwatch_queue.add((wpath, token))
 
     def unwatch(self, wpath, token):
         """Removes a previously added watch.
@@ -674,7 +679,7 @@ class Monitor(object):
         check_watch_path(wpath)
         self.client.ack(Op.UNWATCH, wpath + NUL, token + NUL)
         self.client.router.unsubscribe(token, self)
-        del self.watched[wpath]
+        self.unwatch_queue.discard((wpath, token))
 
     def wait(self, unwatched=False):
         """Yields events for all of the watched paths.
@@ -692,12 +697,11 @@ class Monitor(object):
                 while not self.events._qsize():
                     _condition_wait(self.events.not_empty)
 
-            event = self.events.get_nowait()
+            event = wpath, token = self.events.get_nowait()
 
             # Check that event path or its parent is watched.
-            path = event.path
-            while path and path not in self.watched:
-                path = posixpath.dirname(path)
+            while wpath and (wpath, token) not in self.unwatch_queue:
+                wpath = posixpath.dirname(wpath)
 
-            if path or unwatched:
+            if wpath or unwatched:
                 yield event
