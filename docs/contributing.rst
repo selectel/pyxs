@@ -21,6 +21,25 @@ using VirtualBox.
 3. `Configure <http://stackoverflow.com/a/10532299/262432>`_ VM for SSH access.
 4. Done! You can now ``rsync`` your changes to the VM and run the tests.
 
+Running the tests
+-----------------
+
+Only ``root`` is allowed to access XenStore, so the tests require ``sudo``::
+
+    $ sudo python setup.py test
+
+``pyxs`` strives to work across a range of Python versions. Use ``tox`` to
+run the tests on all supported versions::
+
+    $ cat tox.ini
+    [tox]
+    envlist = py26,py27,py34,py35,pypy
+
+    [testenv]
+    commands = python setup.py test
+    $ sudo tox
+
+
 Style guide
 -----------
 
