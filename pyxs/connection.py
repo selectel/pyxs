@@ -199,7 +199,7 @@ class _XenBusTransport(object):
             self.fd = os.open(path, os.O_RDWR)
         except OSError as e:
             raise ConnectionError("error while opening {0!r}: {1}"
-                                  .format(self.path, e.args))
+                                  .format(path, e.args))
 
     def fileno(self):
         return self.fd
