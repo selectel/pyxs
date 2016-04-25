@@ -127,7 +127,7 @@ def _get_unix_socket_path():
 
 
 class _UnixSocketTransport(object):
-    def __init__(self, path=None):
+    def __init__(self, path):
         try:
             self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             self.sock.connect(path)
