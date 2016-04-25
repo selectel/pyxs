@@ -98,7 +98,6 @@ class Router(object):
         return "Router({0})".format(self.connection)
 
     def __call__(self):
-        self.connection.connect()
         try:
             while True:
                 rlist, _wlist, _xlist = select.select(
@@ -154,6 +153,11 @@ class Router(object):
 
         Does nothing if the router is already started.
         """
+        # Connection is deliberately done in the calling thread so that
+        # ``ConnectionError`` could be handled. See issue #8 on GitHub
+        # for details.
+        self.connection.connect()
+
         if not self.thread.is_alive():
             self.thread.start()
 
@@ -311,6 +315,10 @@ class Client(object):
 
     def connect(self):
         """Connects to the XenStore daemon.
+
+        :raises pyxs.exceptions.ConnectionError: if the connection could
+            not be opened. This could happen either because XenStore is
+            not running on the machine or due to the lack of permissions.
 
         .. versionadded: 0.4.0
 
