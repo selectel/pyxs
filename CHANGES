@@ -6,7 +6,7 @@ Here you can see the full list of changes between each pyxs release.
 Version 0.4.1
 -------------
 
-Bugfix release
+Bugfix release, released on May 11th, 2016
 
 - Fixed a bug in ``XenBusConnection.create_transport`` which failed
   on attribute lookup. See PR #7 on GitHub.
