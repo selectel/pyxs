@@ -44,7 +44,7 @@ from .connection import UnixSocketConnection, XenBusConnection
 from .exceptions import UnexpectedPacket, ConnectionError, PyXSError
 from .helpers import check_path, check_watch_path, check_perms, error
 
-_re_7bit_ascii = re.compile(b"^[\x00\x20-\x7f]+$")
+_re_7bit_ascii = re.compile(b"^[\x00\x20-\x7f]*$")
 
 
 class Router(object):
