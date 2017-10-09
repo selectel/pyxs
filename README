@@ -37,12 +37,13 @@ and run::
 
     python setup.py install
 
-Fedora users can install the package from the system repository.
+Fedora users can install the package from the system repository::
 
     dnf install python2-pyxs
     dnf install python3-pyxs
 
-RHEL/CentOS users can install the package from the [EPEL](https://fedoraproject.org/wiki/EPEL) repository.
+RHEL/CentOS users can install the package from the
+`EPEL <https://fedoraproject.org/wiki/EPEL>`_ repository::
 
     yum install python2-pyxs
     yum install python34-pyxs
