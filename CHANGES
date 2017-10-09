@@ -3,7 +3,7 @@ pyxs Changelog
 
 Here you can see the full list of changes between each pyxs release.
 
-Version 0.4.2
+Version 0.4.2-dev
 -------------
 
 - Allowed values to be empty ``b""``. Thanks to Stephen Czetty. See
