@@ -125,11 +125,8 @@ def test_check_path(op):
 
 @pytest.yield_fixture(params=[UnixSocketConnection, XenBusConnection])
 def client(request):
-    c = Client(router=Router(request.param()))
-    try:
-        yield c.__enter__()
-    finally:
-        c.__exit__(sys.exc_info())
+    with Client(router=Router(request.param())) as c:
+        yield c
 
 
 @virtualized
