@@ -73,7 +73,7 @@ class Router(object):
           :meth:`~pyxs.client.Router.terminate` to force-stop the mainloop.
        2. All operations with :class:`threading.Condition` variables user
           a 1 second timeout. This "hack" is only relevant for Python
-          prior to 3.2 which didn't allow to interrupt lock acquisitions.
+          prior to 3.2 which didn't allow one to interrupt lock acquisitions.
           See `issue8844`_ on CPython issue tracker for details. On
           Python 3.2 and later no timeout is used.
 

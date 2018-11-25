@@ -38,7 +38,7 @@ class InvalidPayload(ValueError, PyXSError):
 
 
 class InvalidPath(ValueError, PyXSError):
-    """Exception raised when a path proccessed by a comand doesn't
+    """Exception raised when a path proccessed by a command doesn't
     match the following constraints:
 
     * its length should not exceed 3072 or 2048 for absolute and
@@ -70,7 +70,7 @@ class ConnectionError(PyXSError):
 
 
 class UnexpectedPacket(ConnectionError):
-    """Exception raised when recieved packet header doesn't match the
+    """Exception raised when received packet header doesn't match the
     header of the packet sent, for example if outgoing packet has
     ``op = Op.READ`` the incoming packet is expected to have
     ``op = Op.READ`` as well.

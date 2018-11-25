@@ -21,7 +21,7 @@ a shortlist:
 * ``pyxs`` supports both Python 2 and 3,
 * works over a Unix socket or XenBus,
 * has a clean and well-documented API,
-* is writen in easy to understand Python,
+* is written in easy to understand Python,
 * can be used with `gevent <http://www.gevent.org>`_ or
   `eventlet <http://eventlet.net>`_.
 

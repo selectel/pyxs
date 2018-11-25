@@ -60,9 +60,9 @@ class Packet(namedtuple("_Packet", "op rq_id tx_id size payload")):
                    operation, performed by this packet.
     :param bytes payload: packet payload, should be a valid ASCII-string
                           with characters between ``[0x20; 0x7f]``.
-    :param int rq_id: request id -- hopefuly a **unique** identifier
+    :param int rq_id: request id -- hopefully a **unique** identifier
                       for this packet, XenStore simply echoes this value
-                      back in reponse.
+                      back in response.
     :param int tx_id: transaction id, defaults to ``0`` , which means
                       no transaction is running.
 
