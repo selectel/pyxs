@@ -259,7 +259,7 @@ latex_documents = [
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'pyxs', u'pyxs Documentation',
-     [u'Sergei Lebedev, Fedor Gogolev'], 1)
+     [u'Sergei Lebedev, Fedor Gogolev'], 3)
 ]
 
 
